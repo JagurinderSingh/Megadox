@@ -1,0 +1,6 @@
+# Files Ignored
+.env
+.venv
+daily_fetch_data_logs
+venv
+
