@@ -194,8 +194,6 @@ def today_date_fetch():
   return today
 
 today_date = today_date_fetch()
-previous_date = today_date - timedelta(days=4)
-previous_date = previous_date.strftime("%d-%m-%Y")
 today_date = today_date_fetch().strftime("%d-%m-%Y")
 
 def user_agent_and_impersonates_selection():
@@ -319,7 +317,7 @@ with output_database_engine_connection.connect() as conn:
   logger.info(f"║           NIFTY INDEX DAILY PRICE FETCHER — EXECUTION LOG            ║")
   logger.info(f"╠══════════════════════════════════════════════════════════════════════╣")
   logger.info(f"║  RUN DATE      : {dt.now().strftime('%d-%b-%Y %I:%M:%S %p'):<52}║")
-  logger.info(f"║  FETCH DATE    : {previous_date:<52}║")
+  logger.info(f"║  FETCH DATE    : {today_date:<52}║")
   logger.info(f"║  TOTAL INDICES : {str(len(index_dictionary)):<52}║")
   logger.info(f"║  DATA SOURCE   : NSE INDIA                                           ║")
   logger.info(f"╚══════════════════════════════════════════════════════════════════════╝")
@@ -337,7 +335,7 @@ with output_database_engine_connection.connect() as conn:
     logger.info(f"│  INDEX NAME   : {index_dictionary.get(index_id):<54}│")
     logger.info(f"└──────────────────────────────────────────────────────────────────────┘")
 
-    output_nse_main_data_fetch = nse_main_data_fetch(previous_date, index_id)
+    output_nse_main_data_fetch = nse_main_data_fetch(today_date, index_id)
 
     if output_nse_main_data_fetch.get("response_code") == 200:
 
