@@ -193,8 +193,8 @@ def today_date_fetch():
   today = date.today()
   return today
 
-today_date = today_date_fetch()
-today_date = today_date_fetch().strftime("%d-%m-%Y")
+today_date = today_date_fetch()                 # - timedelta(days=1) Just dump this line of code to test for previous days
+today_date = today_date.strftime("%d-%m-%Y")
 
 def user_agent_and_impersonates_selection():
 
@@ -244,7 +244,7 @@ def environment_setup_nse_main():
 
 output_environment_setup_nse_main = environment_setup_nse_main()
 
-def nse_main_data_fetch(previous_date, index_id):
+def nse_main_data_fetch(today_date, index_id):
     
     # The Actual Data Fetch
     encoded_index_long_name = urllib.parse.quote(index_dictionary.get(index_id))
@@ -345,8 +345,7 @@ with output_database_engine_connection.connect() as conn:
         logger.info(f"  STATUS        : ⚠  DATA IS NONE — SKIPPED")
         logger.info(f"  RESPONSE CODE : 200 (Empty Payload)")
         logger.info(f"")
-        continue
-
+        
       elif output_nse_main_data_fetch.get("data") is not None:
 
         input_injection = output_nse_main_data_fetch.get("data")
@@ -357,7 +356,6 @@ with output_database_engine_connection.connect() as conn:
             logger.info(f"  STATUS        : ⚠  DATA IS EMPTY [] — SKIPPED")
             logger.info(f"  RESPONSE CODE : 200 (No Records Returned)")
             logger.info(f"")
-            continue
 
         # ── INPUT BLOCK ──────────────────────────────────────────────────
         logger.info(f"  STATUS        : ✓  DATA RECEIVED — RESPONSE 200")
@@ -386,14 +384,10 @@ with output_database_engine_connection.connect() as conn:
         logger.info(f"")
 
         success_count += 1
-        sleeping_time = random.uniform(1, 10)
         last_updated = datetime.now(ZoneInfo("Asia/Kolkata")).replace(tzinfo=None)
         logger.info(f"  INJECTION     : ✓  COMMITTED TO price_metadata")
         logger.info(f"  LAST UPDATED  : {last_updated.strftime('%d-%b-%Y %I:%M:%S %p')}")
-        logger.info(f"  WAIT          : {sleeping_time:.4f} Seconds")
-        time.sleep(sleeping_time)
-        logger.info(f"")
-
+        
     elif output_nse_main_data_fetch.get("response_code") != 200:
 
       failed_count += 1
@@ -402,6 +396,11 @@ with output_database_engine_connection.connect() as conn:
       logger.info(f"  ACTION        : PROCESS ABORTED")
       logger.info(f"")
       sys.exit()
+
+    sleeping_time = random.uniform(1, 10)
+    logger.info(f"  WAIT          : {sleeping_time:.4f} Seconds")
+    time.sleep(sleeping_time)
+    logger.info(f"")
 
   # ── SUMMARY BLOCK ────────────────────────────────────────────────────────
   logger.info(f"")
