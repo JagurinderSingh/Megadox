@@ -193,7 +193,7 @@ def today_date_fetch():
   today = date.today()
   return today
 
-today_date = today_date_fetch()                 # - timedelta(days=1) Just dump this line of code to test for previous days
+today_date = today_date_fetch()       # - timedelta(days=2) #Just dump this line of code to test for previous days
 today_date = today_date.strftime("%d-%m-%Y")
 
 def user_agent_and_impersonates_selection():
@@ -287,6 +287,10 @@ def data_inject_nse_main_database(data_nse_value, index_id):
   for bracket_nse in range (0, len(data_nse_value)):
 
     date_program = data_nse_value[bracket_nse].get("EOD_TIMESTAMP") #Fetched Date from Dictionary
+
+    if date_program is None:
+      continue
+
     date_program_datetime = datetime.strptime(date_program, "%d-%b-%Y") #Converting <str> datatype into datetime datatype
     date_program_formatted = date_program_datetime.strftime("%Y-%m-%d") #Changed the Format of Date to match PostgreSQL
     date_program_formatted_datetime = datetime.strptime(date_program_formatted, "%Y-%m-%d") #Converting <str> datatype into datetime datatype as changing format turns the date into <str> format
@@ -299,6 +303,10 @@ def data_inject_nse_main_database(data_nse_value, index_id):
     close_index_value = data_nse_value[bracket_nse].get("EOD_CLOSE_INDEX_VAL")
     shares_traded_number = data_nse_value[bracket_nse].get("HIT_TRADED_QTY")
     turnover_inr_cr_value = data_nse_value[bracket_nse].get("HIT_TURN_OVER")
+
+    #Skipping Empty Fields
+    if open_index_value is None and high_index_value is None and low_index_value is None and close_index_value is None and shares_traded_number is None and turnover_inr_cr_value is None:
+      continue
       
     #Finally Pushing Whole Data into the Database
     query = text("INSERT INTO price_metadata (index_id, trade_date, open_price, high_price, low_price, close_price, last_updated_time, shares_traded, turnover_inr_cr) VALUES (:index_id, :trade_date, :open_price, :high_price, :low_price, :close_price, :last_updated_time, :shares_traded, :turnover_inr_cr)")
@@ -326,6 +334,7 @@ with output_database_engine_connection.connect() as conn:
   success_count = 0
   skipped_count = 0
   failed_count = 0
+  skipped_indices = []
   start_time = dt.now()
 
   for index_id in range(1, len(index_dictionary) + 1):
@@ -342,6 +351,7 @@ with output_database_engine_connection.connect() as conn:
       if output_nse_main_data_fetch.get("data") is None:
 
         skipped_count += 1
+        skipped_indices.append(f"{index_id}: {index_dictionary.get(index_id)} (No Data)")
         logger.info(f"  STATUS        : ⚠  DATA IS NONE — SKIPPED")
         logger.info(f"  RESPONSE CODE : 200 (Empty Payload)")
         logger.info(f"")
@@ -353,40 +363,43 @@ with output_database_engine_connection.connect() as conn:
         # ── EMPTY LIST CHECK ─────────────────────────────────────────────
         if len(input_injection) == 0:
             skipped_count += 1
+            skipped_indices.append(f"{index_id}: {index_dictionary.get(index_id)} (Empty [])")
             logger.info(f"  STATUS        : ⚠  DATA IS EMPTY [] — SKIPPED")
             logger.info(f"  RESPONSE CODE : 200 (No Records Returned)")
             logger.info(f"")
 
-        # ── INPUT BLOCK ──────────────────────────────────────────────────
-        logger.info(f"  STATUS        : ✓  DATA RECEIVED — RESPONSE 200")
-        logger.info(f"  RECORDS FOUND : {len(input_injection)}")
-        logger.info(f"")
-        logger.info(f"  ┌─ INPUT TO DATABASE {'─'*51}┐")
-        for i, record in enumerate(input_injection):
-          logger.info(f"  │  Record [{i+1}]")
-          for key, value in record.items():
-            logger.info(f"  │    {key:<35} : {value}")
-        logger.info(f"  └{'─'*71}┘")
-        logger.info(f"")
+        else:
 
-        # ── INJECTION ────────────────────────────────────────────────────
-        output_injection = data_inject_nse_main_database(
-          output_nse_main_data_fetch.get("data"), index_id
-        )
+          # ── INPUT BLOCK ──────────────────────────────────────────────────
+          logger.info(f"  STATUS        : ✓  DATA RECEIVED — RESPONSE 200")
+          logger.info(f"  RECORDS FOUND : {len(input_injection)}")
+          logger.info(f"")
+          logger.info(f"  ┌─ INPUT TO DATABASE {'─'*51}┐")
+          for i, record in enumerate(input_injection):
+            logger.info(f"  │  Record [{i+1}]")
+            for key, value in record.items():
+              logger.info(f"  │    {key:<35} : {value}")
+          logger.info(f"  └{'─'*71}┘")
+          logger.info(f"")
 
-        # ── OUTPUT BLOCK ─────────────────────────────────────────────────
-        logger.info(f"  ┌─ OUTPUT AFTER CLEANING (INJECTED TO DB) {'─'*29}┐")
-        for i, record in enumerate(output_injection):
-          logger.info(f"  │  Record [{i+1}]")
-          for key, value in record.items():
-            logger.info(f"  │    {key:<35} : {value}")
-        logger.info(f"  └{'─'*71}┘")
-        logger.info(f"")
+          # ── INJECTION ────────────────────────────────────────────────────
+          output_injection = data_inject_nse_main_database(
+            output_nse_main_data_fetch.get("data"), index_id
+          )
 
-        success_count += 1
-        last_updated = datetime.now(ZoneInfo("Asia/Kolkata")).replace(tzinfo=None)
-        logger.info(f"  INJECTION     : ✓  COMMITTED TO price_metadata")
-        logger.info(f"  LAST UPDATED  : {last_updated.strftime('%d-%b-%Y %I:%M:%S %p')}")
+          # ── OUTPUT BLOCK ─────────────────────────────────────────────────
+          logger.info(f"  ┌─ OUTPUT AFTER CLEANING (INJECTED TO DB) {'─'*29}┐")
+          for i, record in enumerate(output_injection):
+            logger.info(f"  │  Record [{i+1}]")
+            for key, value in record.items():
+              logger.info(f"  │    {key:<35} : {value}")
+          logger.info(f"  └{'─'*71}┘")
+          logger.info(f"")
+
+          success_count += 1
+          last_updated = datetime.now(ZoneInfo("Asia/Kolkata")).replace(tzinfo=None)
+          logger.info(f"  INJECTION     : ✓  COMMITTED TO price_metadata")
+          logger.info(f"  LAST UPDATED  : {last_updated.strftime('%d-%b-%Y %I:%M:%S %p')}")
         
     elif output_nse_main_data_fetch.get("response_code") != 200:
 
@@ -414,11 +427,19 @@ with output_database_engine_connection.connect() as conn:
   hours = total_seconds // 3600
   minutes = (total_seconds % 3600) // 60
   seconds = total_seconds % 60
-  logger.info(f"║  TOTAL TIME TAKEN    : {f'{hours}h {minutes}m {seconds}s':<52}║")
+  logger.info(f"║  TIME TAKEN    : {f'{hours}h {minutes}m {seconds}s':<52}║")
   logger.info(f"║  TOTAL         : {str(len(index_dictionary)):<52}║")
   logger.info(f"║  ✓  INJECTED   : {str(success_count):<52}║")
   logger.info(f"║  ⚠  SKIPPED    : {str(skipped_count):<52}║")
   logger.info(f"║  ✗  FAILED     : {str(failed_count):<52}║")
+  logger.info(f"╠══════════════════════════════════════════════════════════════════════╣")
+  logger.info(f"║  SKIPPED INDEX DETAILS                                               ║")
+  logger.info(f"╠══════════════════════════════════════════════════════════════════════╣")
+  if skipped_indices:
+    for entry in skipped_indices:
+        logger.info(f"║  ⚠  {entry:<66}║")
+  else:
+    logger.info(f"║  ⚠  None — All indices processed successfully                        ║")
   logger.info(f"╚══════════════════════════════════════════════════════════════════════╝")
   logger.info(f"")
 

@@ -191,6 +191,10 @@ def data_inject_nse_main_database(data_nse_value):
   for bracket_nse in range (0, len(data_nse_value)):
 
     date_program = data_nse_value[bracket_nse].get("EOD_TIMESTAMP") #Fetched Date from Dictionary
+
+    if date_program is None:
+      continue
+
     date_program_datetime = datetime.strptime(date_program, "%d-%b-%Y") #Converting <str> datatype into datetime datatype
     date_program_formatted = date_program_datetime.strftime("%Y-%m-%d") #Changed the Format of Date to match PostgreSQL
     date_program_formatted_datetime = datetime.strptime(date_program_formatted, "%Y-%m-%d") #Converting <str> datatype into datetime datatype as changing format turns the date into <str> format
@@ -203,6 +207,9 @@ def data_inject_nse_main_database(data_nse_value):
     close_index_value = data_nse_value[bracket_nse].get("EOD_CLOSE_INDEX_VAL")
     shares_traded_number = data_nse_value[bracket_nse].get("HIT_TRADED_QTY")
     turnover_inr_cr_value = data_nse_value[bracket_nse].get("HIT_TURN_OVER")
+
+    if open_index_value is None and high_index_value is None and low_index_value is None and close_index_value is None and shares_traded_number is None and turnover_inr_cr_value is None:
+      continue
       
     #Finally Pushing Whole Data into the Database
     query = text("INSERT INTO price_metadata (index_id, trade_date, open_price, high_price, low_price, close_price, last_updated_time, shares_traded, turnover_inr_cr) VALUES (:index_id, :trade_date, :open_price, :high_price, :low_price, :close_price, :last_updated_time, :shares_traded, :turnover_inr_cr)")
@@ -240,6 +247,10 @@ def data_inject_nifty_indices_database(data_nifty_indices_value):
 
     #Formatting the <str> date into properly configured datatype and format
     trade_date_niftyindices = data_nifty_indices_value[bracket_nse].get("HistoricalDate") #Fetched raw str datatype unformatted date
+
+    if trade_date_niftyindices is None:
+      continue
+
     trade_date_niftyindices_datetime_datatype = datetime.strptime(trade_date_niftyindices, "%d %b %Y") #raw unformatted str datatype changed to datetime datatype to change its format
     trade_date_data_formatted = trade_date_niftyindices_datetime_datatype.strftime("%Y-%m-%d") #Correct format but in str datatype
     final_trade_date = datetime.strptime(trade_date_data_formatted, "%Y-%m-%d") # Converted Correct Format into the Final datetime datatype
@@ -249,6 +260,9 @@ def data_inject_nifty_indices_database(data_nifty_indices_value):
     high_price_niftyindices = data_nifty_indices_value[bracket_nse].get("HIGH")
     low_price_niftyindices = data_nifty_indices_value[bracket_nse].get("LOW")
     close_price_niftyindices = data_nifty_indices_value[bracket_nse].get("CLOSE")
+
+    if open_price_niftyindices is None and high_price_niftyindices is None and low_price_niftyindices is None and close_price_niftyindices is None:
+      continue
       
     #Finally Pushing Whole Nifty Indices Data into the Database
     query = text("INSERT INTO price_metadata (index_id, trade_date, open_price, high_price, low_price, close_price, last_updated_time, shares_traded, turnover_inr_cr) VALUES (:index_id, :trade_date, :open_price, :high_price, :low_price, :close_price, :last_updated_time, :shares_traded, :turnover_inr_cr)")

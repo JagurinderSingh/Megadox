@@ -21,7 +21,7 @@ load_dotenv()
 # Logging Script
 
 log_folder = r"C:\Users\Riddhima Singh\Desktop\Index Value Strategy\daily_fetch_data_logs"
-log_filename = os.path.join(log_folder, f"price_fetch_log_{dt.now().strftime('%Y-%m-%d_%H-%M-%S')}.txt")
+log_filename = os.path.join(log_folder, f"valuation_fetch_log_{dt.now().strftime('%Y-%m-%d_%H-%M-%S')}.txt")
 
 logging.basicConfig(
     level=logging.INFO,
@@ -49,15 +49,151 @@ def database_engine_connection():
 
 output_database_engine_connection = database_engine_connection()
 
-#Index Dictionary for INDIA VIX Only
-index_dictionary = {136: "INDIA VIX"}
+#Index Dictionary manually synced with index_metadata
+index_dictionary = {
+    1: "NIFTY 100",
+    2: "NIFTY 200",
+    3: "NIFTY 50",
+    4: "NIFTY 500",
+    5: "NIFTY INDIA FPI 150",
+    6: "NIFTY LARGEMIDCAP 250",
+    7: "NIFTY MICROCAP 250",
+    8: "NIFTY MIDCAP 100",
+    9: "NIFTY MIDCAP 150",
+    10: "NIFTY MIDCAP 50",
+    11: "NIFTY MIDCAP SELECT",
+    12: "NIFTY MIDSMALLCAP 400",
+    13: "NIFTY 1D RATE INDEX",
+    14: "NIFTY NEXT 50",
+    15: "NIFTY SMALLCAP 100",
+    16: "NIFTY SMALLCAP 250",
+    17: "NIFTY SMALLCAP 50",
+    18: "NIFTY MIDSMALLCAP400 50:50",
+    19: "NIFTY TOTAL MARKET",
+    20: "NIFTY500 LARGEMIDSMALL EQUAL-CAP WEIGHTED",
+    21: "NIFTY500 MULTICAP 50:25:25",
+    22: "NIFTY AUTO",
+    23: "NIFTY BANK",
+    24: "NIFTY SMALLCAP 500",
+    25: "NIFTY CHEMICALS",
+    26: "NIFTY CONSUMER DURABLES",
+    27: "NIFTY FINANCIAL SERVICES",
+    28: "NIFTY FINANCIAL SERVICES 25/50",
+    29: "NIFTY FINANCIAL SERVICES EX-BANK",
+    30: "NIFTY FMCG",
+    31: "NIFTY HEALTHCARE INDEX",
+    32: "NIFTY IT",
+    33: "NIFTY MEDIA",
+    34: "NIFTY METAL",
+    35: "NIFTY MIDSMALL FINANCIAL SERVICES",
+    36: "NIFTY MIDSMALL HEALTHCARE",
+    37: "NIFTY MIDSMALL IT & TELECOM",
+    38: "NIFTY OIL & GAS",
+    39: "NIFTY PHARMA",
+    40: "NIFTY PRIVATE BANK",
+    41: "NIFTY PSU BANK",
+    42: "NIFTY REALTY",
+    43: "NIFTY REITS & REALTY",
+    44: "NIFTY500 HEALTHCARE",
+    45: "NIFTY 50 ARBITRAGE",
+    46: "NIFTY 50 FUTURES INDEX",
+    47: "NIFTY 50 FUTURES TR INDEX",
+    48: "NIFTY ALPHA 50",
+    49: "NIFTY ALPHA LOW-VOLATILITY 30",
+    50: "NIFTY ALPHA QUALITY LOW-VOLATILITY 30",
+    51: "NIFTY ALPHA QUALITY VALUE LOW-VOLATILITY 30",
+    52: "NIFTY DIVIDEND OPPORTUNITIES 50",
+    53: "NIFTY GROWTH SECTORS 15",
+    54: "NIFTY HIGH BETA 50",
+    55: "NIFTY LOW VOLATILITY 50",
+    56: "NIFTY MIDCAP150 MOMENTUM 50",
+    57: "NIFTY MIDCAP150 QUALITY 50",
+    58: "NIFTY MIDSMALLCAP400 MOMENTUM QUALITY 100",
+    59: "NIFTY QUALITY LOW-VOLATILITY 30",
+    60: "NIFTY SMALLCAP250 MOMENTUM QUALITY 100",
+    61: "NIFTY SMALLCAP250 QUALITY 50",
+    62: "NIFTY TOP 10 EQUAL WEIGHT",
+    63: "NIFTY TOP 15 EQUAL WEIGHT",
+    64: "NIFTY TOP 20 EQUAL WEIGHT",
+    65: "NIFTY TOTAL MARKET MOMENTUM QUALITY 50",
+    66: "NIFTY100 ALPHA 30",
+    67: "NIFTY100 EQUAL WEIGHT",
+    68: "NIFTY100 LOW VOLATILITY 30",
+    69: "NIFTY100 QUALITY 30",
+    70: "NIFTY200 ALPHA 30",
+    71: "NIFTY200 MOMENTUM 30",
+    72: "NIFTY200 QUALITY 30",
+    73: "NIFTY200 VALUE 30",
+    74: "NIFTY50 DIVIDEND POINTS",
+    75: "NIFTY50 EQUAL WEIGHT",
+    76: "NIFTY50 PR 1X INVERSE",
+    77: "NIFTY50 PR 2X LEVERAGE",
+    78: "NIFTY50 TR 1X INVERSE",
+    79: "NIFTY50 TR 2X LEVERAGE",
+    80: "NIFTY50 USD",
+    81: "NIFTY50 VALUE 20",
+    82: "NIFTY500 EQUAL WEIGHT",
+    83: "NIFTY500 FLEXICAP QUALITY 30",
+    84: "NIFTY500 LOW VOLATILITY 50",
+    85: "NIFTY500 MOMENTUM 50",
+    86: "NIFTY500 MULTICAP MOMENTUM QUALITY 50",
+    87: "NIFTY500 MULTIFACTOR MQVLV 50",
+    88: "NIFTY500 QUALITY 50",
+    89: "NIFTY500 VALUE 50",
+    90: "NIFTY CAPITAL MARKETS",
+    91: "NIFTY COMMODITIES",
+    92: "NIFTY CONGLOMERATE 50",
+    93: "NIFTY CORE HOUSING",
+    94: "NIFTY CPSE",
+    95: "NIFTY ENERGY",
+    96: "NIFTY EV & NEW AGE AUTOMOTIVE",
+    97: "NIFTY HOUSING",
+    98: "NIFTY INDIA CONSUMPTION",
+    99: "NIFTY INDIA CORPORATE GROUP INDEX - ADITYA BIRLA GROUP",
+    100: "NIFTY INDIA CORPORATE GROUP INDEX - MAHINDRA GROUP",
+    101: "NIFTY INDIA CORPORATE GROUP INDEX - TATA GROUP",
+    102: "NIFTY INDIA CORPORATE GROUP INDEX - TATA GROUP 25% CAP",
+    103: "NIFTY INDIA DEFENCE",
+    104: "NIFTY INDIA DIGITAL",
+    105: "NIFTY INDIA INFRASTRUCTURE & LOGISTICS",
+    106: "NIFTY INDIA INTERNET",
+    107: "NIFTY INDIA MANUFACTURING",
+    108: "NIFTY INDIA NEW AGE CONSUMPTION",
+    109: "NIFTY INDIA RAILWAYS PSU",
+    110: "NIFTY INDIA SELECT 5 CORPORATE GROUPS (MAATR)",
+    111: "NIFTY INDIA TOURISM",
+    112: "NIFTY INFRASTRUCTURE",
+    113: "NIFTY IPO",
+    114: "NIFTY MIDCAP LIQUID 15",
+    115: "NIFTY MIDSMALL INDIA CONSUMPTION",
+    116: "NIFTY MNC",
+    117: "NIFTY MOBILITY",
+    118: "NIFTY NON-CYCLICAL CONSUMER",
+    119: "NIFTY PSE",
+    120: "NIFTY REITS & INVITS",
+    121: "NIFTY RURAL",
+    122: "NIFTY SERVICES SECTOR",
+    123: "NIFTY SHARIAH 25",
+    124: "NIFTY SME EMERGE",
+    125: "NIFTY TRANSPORTATION & LOGISTICS",
+    126: "NIFTY WAVES",
+    127: "NIFTY100 ENHANCED ESG",
+    128: "NIFTY100 ESG",
+    129: "NIFTY 100 ESG SECTOR LEADERS",
+    130: "NIFTY100 LIQUID 15",
+    131: "NIFTY50 SHARIAH",
+    132: "NIFTY500 MULTICAP INDIA MANUFACTURING 50:30:20",
+    133: "NIFTY500 MULTICAP INFRASTRUCTURE 50:30:20",
+    134: "NIFTY500 SHARIAH",
+    135: "NIFTY CEMENT"
+}
 
 def today_date_fetch():
 
   today = date.today()
   return today
 
-today_date = today_date_fetch() # - timedelta(days=2) #Just dump this line of code to test for previous days
+today_date = today_date_fetch() - timedelta(days=2) #Just dump this line of code to test for previous days
 today_date = today_date.strftime("%d-%m-%Y")
 
 def user_agent_and_impersonates_selection():
@@ -108,12 +244,12 @@ def environment_setup_nse_main():
 
 output_environment_setup_nse_main = environment_setup_nse_main()
 
-def nse_main_data_fetch(acceptable_start_date, index_id):
+def nse_main_data_fetch(today_date, index_id):
     
     # The Actual Data Fetch
     encoded_index_long_name = urllib.parse.quote(index_dictionary.get(index_id))
 
-    url = f"https://www.nseindia.com/api/historicalOR/vixhistory?from={today_date}&to={today_date}"
+    url = f"https://www.nseindia.com/api/historicalOR/indicesYield?indexType={encoded_index_long_name}&from={today_date}&to={today_date}"
 
     response = output_environment_setup_nse_main.get("session").get(url, headers = output_environment_setup_nse_main.get("headers"), impersonate = output_user_agent_and_impersonates_selection.get("impersonate_choice"), timeout=10)
     data_nse = response.json()
@@ -150,7 +286,7 @@ def data_inject_nse_main_database(data_nse_value, index_id):
 
   for bracket_nse in range (0, len(data_nse_value)):
 
-    date_program = data_nse_value[bracket_nse].get("EOD_TIMESTAMP") #Fetched Date from Dictionary
+    date_program = data_nse_value[bracket_nse].get("IY_DT") #Fetched Date from Dictionary
 
     if date_program is None:
       continue
@@ -161,20 +297,17 @@ def data_inject_nse_main_database(data_nse_value, index_id):
     date_program_formatted_datetime_onlydate = date_program_formatted_datetime.date() #Contains only the date part and not the time part
 
     #Formatting the Data into correct datatype
-    open_index_value = data_nse_value[bracket_nse].get("EOD_OPEN_INDEX_VAL")
-    high_index_value = data_nse_value[bracket_nse].get("EOD_HIGH_INDEX_VAL")
-    low_index_value = data_nse_value[bracket_nse].get("EOD_LOW_INDEX_VAL")
-    close_index_value = data_nse_value[bracket_nse].get("EOD_CLOSE_INDEX_VAL")
-    previous_close_value = data_nse_value[bracket_nse].get("EOD_PREV_CLOSE")
-    points_change_value = data_nse_value[bracket_nse].get("VIX_PTS_CHG")
-    percentage_change_value = data_nse_value[bracket_nse].get("VIX_PERC_CHG")
+    pe_value = data_nse_value[bracket_nse].get("IY_PE")
+    pb_value = data_nse_value[bracket_nse].get("IY_PB")
+    div_yield_value = data_nse_value[bracket_nse].get("IY_DY")
 
-    if open_index_value is None and high_index_value is None and low_index_value is None and close_index_value is None and previous_close_value is None and points_change_value is None and percentage_change_value is None:
+    #Skipping Empty Fields
+    if pe_value is None and pb_value is None and div_yield_value is None:
       continue
-      
+    
     #Finally Pushing Whole Data into the Database
-    query = text("INSERT INTO india_vix_metadata (index_id, trade_date, open_price, high_price, low_price, close_price, previous_close_price, points_change, percentage_change, last_updated_time) VALUES (:index_id, :trade_date, :open_price, :high_price, :low_price, :close_price, :previous_close_price, :points_change, :percentage_change, :last_updated_time)")
-    conn.execute(query, {"index_id":index_id, "trade_date":date_program_formatted_datetime_onlydate, "open_price":open_index_value, "high_price":high_index_value, "low_price":low_index_value, "close_price":close_index_value, "previous_close_price":previous_close_value, "points_change":points_change_value, "percentage_change":percentage_change_value, "last_updated_time":datetime.now(ZoneInfo("Asia/Kolkata")).replace(tzinfo=None)})
+    query = text("INSERT INTO valuation_metadata (index_id, trade_date, pe_ratio, pb_ratio, div_yield, last_updated_time) VALUES (:index_id, :trade_date, :pe_ratio, :pb_ratio, :div_yield, :last_updated_time)")
+    conn.execute(query, {"index_id":index_id, "trade_date":date_program_formatted_datetime_onlydate, "pe_ratio":pe_value, "pb_ratio":pb_value, "div_yield":div_yield_value, "last_updated_time":datetime.now(ZoneInfo("Asia/Kolkata")).replace(tzinfo=None)})
     conn.commit()
 
   return data_nse_value
@@ -186,7 +319,7 @@ with output_database_engine_connection.connect() as conn:
 
   logger.info(f"")
   logger.info(f"╔══════════════════════════════════════════════════════════════════════╗")
-  logger.info(f"║           INDIA VIX DAILY PRICE FETCHER — EXECUTION LOG              ║")
+  logger.info(f"║           NIFTY INDEX DAILY VALUATION FETCHER — EXECUTION LOG        ║")
   logger.info(f"╠══════════════════════════════════════════════════════════════════════╣")
   logger.info(f"║  RUN DATE      : {dt.now().strftime('%d-%b-%Y %I:%M:%S %p'):<52}║")
   logger.info(f"║  FETCH DATE    : {today_date:<52}║")
@@ -201,7 +334,7 @@ with output_database_engine_connection.connect() as conn:
   skipped_indices = []
   start_time = dt.now()
 
-  for index_id in index_dictionary.keys():
+  for index_id in range(1, len(index_dictionary) + 1):
 
     logger.info(f"┌──────────────────────────────────────────────────────────────────────┐")
     logger.info(f"│  INDEX ID     : {str(index_id):<54}│")
@@ -215,11 +348,11 @@ with output_database_engine_connection.connect() as conn:
       if output_nse_main_data_fetch.get("data") is None:
 
         skipped_count += 1
-        logger.info(f"  STATUS        : ⚠  DATA IS NONE — SKIPPED")
         skipped_indices.append(f"{index_id}: {index_dictionary.get(index_id)} (No Data)")
+        logger.info(f"  STATUS        : ⚠  DATA IS NONE — SKIPPED")
         logger.info(f"  RESPONSE CODE : 200 (Empty Payload)")
         logger.info(f"")
-
+        
       elif output_nse_main_data_fetch.get("data") is not None:
 
         input_injection = output_nse_main_data_fetch.get("data")
@@ -247,7 +380,8 @@ with output_database_engine_connection.connect() as conn:
 
           # ── INJECTION ────────────────────────────────────────────────────
           output_injection = data_inject_nse_main_database(
-            output_nse_main_data_fetch.get("data"), index_id)
+            output_nse_main_data_fetch.get("data"), index_id
+          )
 
           # ── OUTPUT BLOCK ─────────────────────────────────────────────────
           logger.info(f"  ┌─ OUTPUT AFTER CLEANING (INJECTED TO DB) {'─'*29}┐")
@@ -260,9 +394,9 @@ with output_database_engine_connection.connect() as conn:
 
           success_count += 1
           last_updated = datetime.now(ZoneInfo("Asia/Kolkata")).replace(tzinfo=None)
-          logger.info(f"  INJECTION     : ✓  COMMITTED TO price_metadata")
+          logger.info(f"  INJECTION     : ✓  COMMITTED TO valuation_metadata")
           logger.info(f"  LAST UPDATED  : {last_updated.strftime('%d-%b-%Y %I:%M:%S %p')}")
-
+        
     elif output_nse_main_data_fetch.get("response_code") != 200:
 
       failed_count += 1
@@ -299,8 +433,9 @@ with output_database_engine_connection.connect() as conn:
   logger.info(f"╠══════════════════════════════════════════════════════════════════════╣")
   if skipped_indices:
     for entry in skipped_indices:
-        logger.info(f"║  ⚠  {entry:<66}║")
+      logger.info(f"║  ⚠  {entry:<66}║")
   else:
     logger.info(f"║  ⚠  None — All indices processed successfully                        ║")
-  logger.info(f"╚══════════════════════════════════════════════════════════════════════╝")
-  logger.info(f"")
+    logger.info(f"╚══════════════════════════════════════════════════════════════════════╝")
+    logger.info(f"")
+  

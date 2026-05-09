@@ -140,6 +140,10 @@ def data_inject_nse_main_database(data_nse_value):
   for bracket_nse in range (0, len(data_nse_value)):
 
     date_program = data_nse_value[bracket_nse].get("EOD_TIMESTAMP") #Fetched Date from Dictionary
+
+    if date_program is None:
+      continue
+
     date_program_datetime = datetime.strptime(date_program, "%d-%b-%Y") #Converting <str> datatype into datetime datatype
     date_program_formatted = date_program_datetime.strftime("%Y-%m-%d") #Changed the Format of Date to match PostgreSQL
     date_program_formatted_datetime = datetime.strptime(date_program_formatted, "%Y-%m-%d") #Converting <str> datatype into datetime datatype as changing format turns the date into <str> format
@@ -154,6 +158,9 @@ def data_inject_nse_main_database(data_nse_value):
     points_change_value = data_nse_value[bracket_nse].get("VIX_PTS_CHG")
     percentage_change_value = data_nse_value[bracket_nse].get("VIX_PERC_CHG")
       
+    if open_index_value is None and high_index_value is None and low_index_value is None and close_index_value is None and previous_close_value is None and points_change_value is None and percentage_change_value is None:
+      continue
+    
     #Finally Pushing Whole Data into the Database
     query = text("INSERT INTO india_vix_metadata (index_id, trade_date, open_price, high_price, low_price, close_price, previous_close_price, points_change, percentage_change, last_updated_time) VALUES (:index_id, :trade_date, :open_price, :high_price, :low_price, :close_price, :previous_close_price, :points_change, :percentage_change, :last_updated_time)")
     conn.execute(query, {"index_id":index_id, "trade_date":date_program_formatted_datetime_onlydate, "open_price":open_index_value, "high_price":high_index_value, "low_price":low_index_value, "close_price":close_index_value, "previous_close_price":previous_close_value, "points_change":points_change_value, "percentage_change":percentage_change_value, "last_updated_time":datetime.now(ZoneInfo("Asia/Kolkata")).replace(tzinfo=None)})
