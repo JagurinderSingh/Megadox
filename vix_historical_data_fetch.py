@@ -163,7 +163,7 @@ def data_inject_nse_main_database(data_nse_value):
     
     #Finally Pushing Whole Data into the Database
     query = text("INSERT INTO india_vix_metadata (index_id, trade_date, open_price, high_price, low_price, close_price, previous_close_price, points_change, percentage_change, last_updated_time) VALUES (:index_id, :trade_date, :open_price, :high_price, :low_price, :close_price, :previous_close_price, :points_change, :percentage_change, :last_updated_time)")
-    conn.execute(query, {"index_id":index_id, "trade_date":date_program_formatted_datetime_onlydate, "open_price":open_index_value, "high_price":high_index_value, "low_price":low_index_value, "close_price":close_index_value, "previous_close_price":previous_close_value, "points_change":points_change_value, "percentage_change":percentage_change_value, "last_updated_time":datetime.now(ZoneInfo("Asia/Kolkata")).replace(tzinfo=None)})
+    conn.execute(query, {"index_id":index_id, "trade_date":date_program_formatted_datetime_onlydate, "open_price":open_index_value, "high_price":high_index_value, "low_price":low_index_value, "close_price":close_index_value, "previous_close_price":previous_close_value, "points_change":points_change_value, "percentage_change":percentage_change_value, "last_updated_time":datetime.now(ZoneInfo("Asia/Kolkata"))})
     conn.commit()
 
 #Printing the Index Long Name to the user
@@ -194,7 +194,7 @@ if proceed == 1:
   print("")
 
   # Rolling Date Calculation
-  rolling_date = start_date + timedelta(days=3)
+  rolling_date = start_date + timedelta(days=30)
   print("")
 
   with output_database_engine_connection.connect() as conn:
@@ -226,7 +226,7 @@ if proceed == 1:
         # Resetting the Dates
         start_date = rolling_date + timedelta(days=1)
         # Ensure rolling_date doesn't exceed end_date
-        rolling_date = min(start_date + timedelta(days=3), end_date) #Takes closer date - end date or the +30 days date
+        rolling_date = min(start_date + timedelta(days=30), end_date) #Takes closer date - end date or the +30 days date
 
         if rolling_date != end_date:
           #Randomized Break
@@ -245,7 +245,7 @@ if proceed == 1:
     print(f"Index Long Name: {output_index_name_fetcher.get("index_long_name")}")
 
     query = text("UPDATE index_metadata SET source = :source, last_updated_time = :last_updated_time, data_origin_date = :data_origin_date WHERE index_id = :index_id")
-    conn.execute(query, {"source":source,"index_id":index_id,"last_updated_time":datetime.now(ZoneInfo("Asia/Kolkata")).replace(tzinfo=None), "data_origin_date":origin_date}) #tzinfo stores that part of time which tells us the timezone by setting it None, we remove that part so clean date and time goes into the table
+    conn.execute(query, {"source":source,"index_id":index_id,"last_updated_time":datetime.now(ZoneInfo("Asia/Kolkata")), "data_origin_date":origin_date}) #tzinfo stores that part of time which tells us the timezone by setting it None, we remove that part so clean date and time goes into the table
     conn.commit()
     print("Updated index_metadata Cleanly!")
     print("")

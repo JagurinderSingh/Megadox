@@ -14,24 +14,59 @@ import sys
 from zoneinfo import ZoneInfo
 from dotenv import load_dotenv
 import os
+import logging
+from datetime import datetime as dt
 
 load_dotenv()
+
+# ── LOGGING SETUP ────────────────────────────────────────────────────────────
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(message)s",
+    handlers=[
+        logging.StreamHandler()
+    ]
+)
+
+logger = logging.getLogger(__name__)
+
+# ─────────────────────────────────────────────────────────────────────────────
 
 #For Null Values Check
 empty_data_list = [None, "None", "0", 0, "-", "NaN", "Null", "NULL", "null", "none", "nan"] #Used only during data cleaning
 
+# ── STARTUP BANNER ───────────────────────────────────────────────────────────
+
+logger.info(f"")
+logger.info(f"╔══════════════════════════════════════════════════════════════════════╗")
+logger.info(f"║        NIFTY INDEX HISTORICAL DATA INGESTION — EXECUTION LOG         ║")
+logger.info(f"╠══════════════════════════════════════════════════════════════════════╣")
+logger.info(f"║  RUN TIMESTAMP : {dt.now().strftime('%d-%b-%Y %I:%M:%S %p'):<52}║")
+logger.info(f"║  SCRIPT        : data_ingestion_price.py                             ║")
+logger.info(f"║  PURPOSE       : Bulk Historical Price Ingestion (Rolling 30-Day)    ║")
+logger.info(f"╚══════════════════════════════════════════════════════════════════════╝")
+logger.info(f"")
+
+# ─────────────────────────────────────────────────────────────────────────────
+
+logger.info(f"  STEP 1        : Awaiting Index ID from user input...")
 index_id = int(input("Enter Index ID: "))
-print("")
+logger.info(f"  INDEX ID      : {index_id}")
+logger.info(f"")
 
 def database_engine_connection():
 
   #Engine Connection Established
   database_password = os.getenv("database_password")
-  DB_URL = f"postgresql://postgres:{database_password}@localhost:5432/index_value_strategy" #No Problem right now even if the password is exposed because this module will only be used to fill past data for all the indices
+  DB_URL = f"postgresql://postgres:{database_password}@localhost:5432/index_value_strategy"
   engine = create_engine(DB_URL)
   return engine
 
+logger.info(f"  STEP 2        : Establishing database engine connection...")
 output_database_engine_connection = database_engine_connection()
+logger.info(f"  DB ENGINE     : ✓  Connected to index_value_strategy")
+logger.info(f"")
 
 def index_name_fetcher(index_id):
   
@@ -51,8 +86,12 @@ def index_name_fetcher(index_id):
     encoded_trading_index_name = urllib.parse.quote(trading_index_name)
 
     return {"index_long_name":index_long_name, "trading_index_name":trading_index_name}
-  
+
+logger.info(f"  STEP 3        : Fetching index metadata from database...")
 output_index_name_fetcher = index_name_fetcher(index_id)
+logger.info(f"  INDEX LONG    : {output_index_name_fetcher.get('index_long_name')}")
+logger.info(f"  TRADING NAME  : {output_index_name_fetcher.get('trading_index_name')}")
+logger.info(f"")
 
 def user_agent_and_impersonates_selection():
 
@@ -100,8 +139,6 @@ def environment_setup_nse_main():
 
     return {"session":session, "headers":headers}
 
-output_environment_setup_nse_main = environment_setup_nse_main()
-
 def environment_setup_nifty_indices():
 
     url = "https://www.niftyindices.com/Backpage.aspx/getHistoricaldatatabletoString"
@@ -115,9 +152,7 @@ def environment_setup_nifty_indices():
     "Origin": "https://www.niftyindices.com",
     "Referer": "https://www.niftyindices.com/reports/historical-data",
     "X-Requested-With": "XMLHttpRequest"
-    }#User Agent - Who am I?
-    #Content Type - What kind of data do I want back?
-    #Referer - Where I am coming from?
+    }
 
     # Visiting home to get the required cookies
     session.get("https://www.niftyindices.com/", headers=headers, impersonate=user_agent_and_impersonates_selection().get("impersonate_choice"), timeout=10)
@@ -128,23 +163,19 @@ def environment_setup_nifty_indices():
 
     return {"session":session, "headers":headers, "url":url}
 
-output_environment_setup_nifty_indices = environment_setup_nifty_indices()
-  
 def nifty_indices_data_fetch(acceptable_start_date, acceptable_rolling_date):
 
-  payload = f'{{"name":"{output_index_name_fetcher.get("index_long_name")}","startDate":"{acceptable_start_date}","endDate":"{acceptable_rolling_date}","indexName":"{output_index_name_fetcher.get("index_long_name")}"}}' # Sending our specialized payload
+  payload = f'{{"name":"{output_index_name_fetcher.get("index_long_name")}","startDate":"{acceptable_start_date}","endDate":"{acceptable_rolling_date}","indexName":"{output_index_name_fetcher.get("index_long_name")}"}}'
 
-  cinfo_data ={"cinfo":payload} # Sending our specialized payload as the key of cinfo in correct format
+  cinfo_data ={"cinfo":payload}
 
-  response = requests.post(output_environment_setup_nifty_indices.get("url"), headers=output_environment_setup_nifty_indices.get("headers"), json=cinfo_data, timeout=10) # Fetching specialized response with the help of passing required arguments(actual values) inside the function
+  response = requests.post(output_environment_setup_nifty_indices.get("url"), headers=output_environment_setup_nifty_indices.get("headers"), json=cinfo_data, timeout=10)
  
-  response.encoding = 'utf-8-sig' # Tells Python the signature contained in the file in the beginning of the file is useless, skip and treat the rest as utf-8 data
-  # UTF-8 is the universal translator, converting the raw 0 and 1 to the letters, numbers and emojis
+  response.encoding = 'utf-8-sig'
 
-  data_niftyindices = response.json() #.json() is a built in method to parse raw text and turn it into list of dictionary python understands
-  print("")
-  data_niftyindices_value_dummy = data_niftyindices.get('d') #It returns Empty JSON String when it is unable to receive any data from Nifty Indices Website provided the status code is success or i.e. 200
-  data = json.loads(data_niftyindices_value_dummy) #JSON String we received had datatype of str which is not suitable to parse so we use this function so that we can turn it into a list
+  data_niftyindices = response.json()
+  data_niftyindices_value_dummy = data_niftyindices.get('d')
+  data = json.loads(data_niftyindices_value_dummy)
 
   return {"response_code":response.status_code, "data":data}
 
@@ -163,12 +194,10 @@ def nse_main_data_fetch(acceptable_start_date, acceptable_rolling_date):
 
 def data_inject_nse_main_database(data_nse_value):
 
-  # Checking for Empty Data - to inject NULL Values 
-
   for bracket in range (0, len(data_nse_value)):
     for key, value in data_nse_value[bracket].items():
 
-      if isinstance(value, str):  # str datatypes will be stripped without any whitespaces e.g. " NIFTY 50 " to "NIFTY 50". No need to take int or float datatype into account as they strip automatically the whitespaces
+      if isinstance(value, str):
            
         data_nse_value[bracket][key] = value.strip()
         value = data_nse_value[bracket][key]
@@ -190,17 +219,16 @@ def data_inject_nse_main_database(data_nse_value):
 
   for bracket_nse in range (0, len(data_nse_value)):
 
-    date_program = data_nse_value[bracket_nse].get("EOD_TIMESTAMP") #Fetched Date from Dictionary
+    date_program = data_nse_value[bracket_nse].get("EOD_TIMESTAMP")
 
     if date_program is None:
       continue
 
-    date_program_datetime = datetime.strptime(date_program, "%d-%b-%Y") #Converting <str> datatype into datetime datatype
-    date_program_formatted = date_program_datetime.strftime("%Y-%m-%d") #Changed the Format of Date to match PostgreSQL
-    date_program_formatted_datetime = datetime.strptime(date_program_formatted, "%Y-%m-%d") #Converting <str> datatype into datetime datatype as changing format turns the date into <str> format
-    date_program_formatted_datetime_onlydate = date_program_formatted_datetime.date() #Contains only the date part and not the time part
+    date_program_datetime = datetime.strptime(date_program, "%d-%b-%Y")
+    date_program_formatted = date_program_datetime.strftime("%Y-%m-%d")
+    date_program_formatted_datetime = datetime.strptime(date_program_formatted, "%Y-%m-%d")
+    date_program_formatted_datetime_onlydate = date_program_formatted_datetime.date()
 
-    #Formatting the Data into correct datatype
     open_index_value = data_nse_value[bracket_nse].get("EOD_OPEN_INDEX_VAL")
     high_index_value = data_nse_value[bracket_nse].get("EOD_HIGH_INDEX_VAL")
     low_index_value = data_nse_value[bracket_nse].get("EOD_LOW_INDEX_VAL")
@@ -211,19 +239,18 @@ def data_inject_nse_main_database(data_nse_value):
     if open_index_value is None and high_index_value is None and low_index_value is None and close_index_value is None and shares_traded_number is None and turnover_inr_cr_value is None:
       continue
       
-    #Finally Pushing Whole Data into the Database
     query = text("INSERT INTO price_metadata (index_id, trade_date, open_price, high_price, low_price, close_price, last_updated_time, shares_traded, turnover_inr_cr) VALUES (:index_id, :trade_date, :open_price, :high_price, :low_price, :close_price, :last_updated_time, :shares_traded, :turnover_inr_cr)")
     conn.execute(query, {"index_id":index_id, "trade_date":date_program_formatted_datetime_onlydate, "open_price":open_index_value, "high_price":high_index_value, "low_price":low_index_value, "close_price":close_index_value, "last_updated_time":datetime.now(ZoneInfo("Asia/Kolkata")).replace(tzinfo=None), "shares_traded":shares_traded_number, "turnover_inr_cr":turnover_inr_cr_value})
     conn.commit()
 
-def data_inject_nifty_indices_database(data_nifty_indices_value):
+  return data_nse_value
 
-  # Checking for Empty Data - to inject NULL Values 
+def data_inject_nifty_indices_database(data_nifty_indices_value):
 
   for bracket in range (0, len(data_nifty_indices_value)):
     for key, value in data_nifty_indices_value[bracket].items():
 
-      if isinstance(value, str):  # str datatypes will be stripped without any whitespaces e.g. " NIFTY 50 " to "NIFTY 50". No need to take int or float datatype into account as they strip automatically the whitespaces
+      if isinstance(value, str):
            
         data_nifty_indices_value[bracket][key] = value.strip()
         value = data_nifty_indices_value[bracket][key]
@@ -245,17 +272,15 @@ def data_inject_nifty_indices_database(data_nifty_indices_value):
 
   for bracket_nse in range (0, len(data_nifty_indices_value)):
 
-    #Formatting the <str> date into properly configured datatype and format
-    trade_date_niftyindices = data_nifty_indices_value[bracket_nse].get("HistoricalDate") #Fetched raw str datatype unformatted date
+    trade_date_niftyindices = data_nifty_indices_value[bracket_nse].get("HistoricalDate")
 
     if trade_date_niftyindices is None:
       continue
 
-    trade_date_niftyindices_datetime_datatype = datetime.strptime(trade_date_niftyindices, "%d %b %Y") #raw unformatted str datatype changed to datetime datatype to change its format
-    trade_date_data_formatted = trade_date_niftyindices_datetime_datatype.strftime("%Y-%m-%d") #Correct format but in str datatype
-    final_trade_date = datetime.strptime(trade_date_data_formatted, "%Y-%m-%d") # Converted Correct Format into the Final datetime datatype
+    trade_date_niftyindices_datetime_datatype = datetime.strptime(trade_date_niftyindices, "%d %b %Y")
+    trade_date_data_formatted = trade_date_niftyindices_datetime_datatype.strftime("%Y-%m-%d")
+    final_trade_date = datetime.strptime(trade_date_data_formatted, "%Y-%m-%d")
 
-    #Fetching the Values
     open_price_niftyindices = data_nifty_indices_value[bracket_nse].get("OPEN")
     high_price_niftyindices = data_nifty_indices_value[bracket_nse].get("HIGH")
     low_price_niftyindices = data_nifty_indices_value[bracket_nse].get("LOW")
@@ -264,152 +289,302 @@ def data_inject_nifty_indices_database(data_nifty_indices_value):
     if open_price_niftyindices is None and high_price_niftyindices is None and low_price_niftyindices is None and close_price_niftyindices is None:
       continue
       
-    #Finally Pushing Whole Nifty Indices Data into the Database
     query = text("INSERT INTO price_metadata (index_id, trade_date, open_price, high_price, low_price, close_price, last_updated_time, shares_traded, turnover_inr_cr) VALUES (:index_id, :trade_date, :open_price, :high_price, :low_price, :close_price, :last_updated_time, :shares_traded, :turnover_inr_cr)")
-    conn.execute(query, {"index_id":index_id, "trade_date":final_trade_date, "open_price":open_price_niftyindices, "high_price":high_price_niftyindices, "low_price":low_price_niftyindices, "close_price":close_price_niftyindices, "last_updated_time":datetime.now(ZoneInfo("Asia/Kolkata")).replace(tzinfo=None), "shares_traded":None, "turnover_inr_cr":None}) #tzinfo stores that part of time which tells us the timezone by setting it None, we remove that part so clean date and time goes into the table
+    conn.execute(query, {"index_id":index_id, "trade_date":final_trade_date, "open_price":open_price_niftyindices, "high_price":high_price_niftyindices, "low_price":low_price_niftyindices, "close_price":close_price_niftyindices, "last_updated_time":datetime.now(ZoneInfo("Asia/Kolkata")).replace(tzinfo=None), "shares_traded":None, "turnover_inr_cr":None})
     conn.commit()
 
-#Printing the Index Long Name and Trading Index Name to the user
-print(f"Index Long Name: {output_index_name_fetcher.get("index_long_name")}")
-print(f"Trading Index Name: {output_index_name_fetcher.get("trading_index_name")}")
-print("")
+  return data_nifty_indices_value
 
-# Enter Data Source Choice
+# ── USER CONFIRMATION BLOCK ──────────────────────────────────────────────────
+
+logger.info(f"┌──────────────────────────────────────────────────────────────────────┐")
+logger.info(f"│                        INDEX CONFIRMATION                            │")
+logger.info(f"├──────────────────────────────────────────────────────────────────────┤")
+logger.info(f"│  INDEX ID     : {str(index_id):<54}│")
+logger.info(f"│  INDEX LONG   : {output_index_name_fetcher.get('index_long_name'):<54}│")
+logger.info(f"│  TRADING NAME : {output_index_name_fetcher.get('trading_index_name'):<54}│")
+logger.info(f"└──────────────────────────────────────────────────────────────────────┘")
+logger.info(f"")
+
+logger.info(f"  STEP 4        : Awaiting data source selection from user...")
 data_source = str(input("Enter Data Source Preference (NSE INDIA/NIFTY INDICES): "))
-print("")
+logger.info(f"  DATA SOURCE   : {data_source}")
+logger.info(f"")
 
-proceed = int(input("Enter 1 to Proceed and 0 to Abort: ")) #Green Flag Validation
-print("")
+logger.info(f"  STEP 5        : Awaiting green flag from user...")
+proceed = int(input("Enter 1 to Proceed and 0 to Abort: "))
+logger.info(f"")
 
 if proceed == 1:
 
   # Input Starting Date
+  logger.info(f"  STEP 6        : Awaiting date range input from user...")
   starting_day = int(input("Enter Starting Day: "))
   starting_month = int(input("Enter Starting Month: "))
   starting_year = int(input("Enter Starting Year: "))
   start_date = datetime(starting_year, starting_month, starting_day)
   origin_date = start_date
-  print("")
 
-  # Input Ending Date
   ending_day = int(input("Enter Ending Day: "))
   ending_month = int(input("Enter Ending Month: "))
   ending_year = int(input("Enter Ending Year: "))
   end_date = datetime(ending_year, ending_month, ending_day)
-  print("")
 
   # Rolling Date Calculation
-  rolling_date = start_date + timedelta(days=3)
-  print("")
+  rolling_date = start_date + timedelta(days=30)
+
+  logger.info(f"")
+  logger.info(f"┌──────────────────────────────────────────────────────────────────────┐")
+  logger.info(f"│                         INGESTION PARAMETERS                         │")
+  logger.info(f"├──────────────────────────────────────────────────────────────────────┤")
+  logger.info(f"│  DATA SOURCE  : {data_source:<54}│")
+  logger.info(f"│  START DATE   : {start_date.strftime('%d-%b-%Y'):<54}│")
+  logger.info(f"│  END DATE     : {end_date.strftime('%d-%b-%Y'):<54}│")
+  logger.info(f"│  WINDOW SIZE  : 30 Days (Rolling)                                    │")
+  logger.info(f"└──────────────────────────────────────────────────────────────────────┘")
+  logger.info(f"")
+
+  # ── COUNTERS ──────────────────────────────────────────────────────────────
+  success_count = 0
+  skipped_count = 0
+  failed_count = 0
+  batch_number = 0
+  start_time = dt.now()
 
   with output_database_engine_connection.connect() as conn:
-    print("Connection Established Successfully!")
-    print("")
+
+    logger.info(f"  DB CONN       : ✓  Connection Established Successfully")
+    logger.info(f"")
  
     if data_source == "NSE INDIA":
 
-      #Setting up the environment just for one time and then utilizing it to hit API again and again
+      logger.info(f"  STEP 7        : Setting up NSE INDIA session & cookies...")
+      output_environment_setup_nse_main = environment_setup_nse_main()
       session = output_environment_setup_nse_main.get("session")
       headers = output_environment_setup_nse_main.get("headers")
-
-      #Pushing Actual Data
+      logger.info(f"  SESSION       : ✓  NSE INDIA session initialized")
+      logger.info(f"  USER AGENT    : {output_user_agent_and_impersonates_selection.get('impersonate_choice')}")
+      logger.info(f"")
+      logger.info(f"  STEP 8        : Beginning rolling batch ingestion from NSE INDIA...")
+      logger.info(f"")
 
       while start_date <= rolling_date:
 
-        # Preparing Dates in acceptable formats
-        acceptable_start_date = start_date.strftime("%d-%m-%Y") #For NSE Main Start Date
-        acceptable_rolling_date = rolling_date.strftime("%d-%m-%Y") #For NSE Main Rolling Date
+        batch_number += 1
+        acceptable_start_date = start_date.strftime("%d-%m-%Y")
+        acceptable_rolling_date = rolling_date.strftime("%d-%m-%Y")
+
+        logger.info(f"┌──────────────────────────────────────────────────────────────────────┐")
+        logger.info(f"│  BATCH        : #{str(batch_number):<53}│")
+        logger.info(f"│  WINDOW START : {acceptable_start_date:<54}│")
+        logger.info(f"│  WINDOW END   : {acceptable_rolling_date:<54}│")
+        logger.info(f"│  SOURCE       : NSE INDIA                                            │")
+        logger.info(f"└──────────────────────────────────────────────────────────────────────┘")
 
         output_nse_main_data_fetch = nse_main_data_fetch(acceptable_start_date, acceptable_rolling_date)
     
         if output_nse_main_data_fetch.get("response_code") == 200:
 
-          #Data Injection Code here
-          print(f"{start_date} to {rolling_date}")
-          print(f"Data: {output_nse_main_data_fetch.get("data")}")
-          print("")
-          data_inject_nse_main_database(output_nse_main_data_fetch.get("data"))
-          
+          data_received = output_nse_main_data_fetch.get("data")
+
+          if data_received is None or len(data_received) == 0:
+
+            skipped_count += 1
+            logger.info(f"  STATUS        : ⚠  DATA IS EMPTY / NONE — BATCH SKIPPED")
+            logger.info(f"  RESPONSE CODE : 200 (No Records in Window)")
+            logger.info(f"")
+
+          else:
+
+            logger.info(f"  STATUS        : ✓  DATA RECEIVED — RESPONSE 200")
+            logger.info(f"  RECORDS FOUND : {len(data_received)}")
+            logger.info(f"")
+
+            # ── INPUT BLOCK ──────────────────────────────────────────────
+            logger.info(f"  ┌─ RAW INPUT FROM NSE INDIA {'─'*43}┐")
+            for i, record in enumerate(data_received):
+              logger.info(f"  │  Record [{i+1}]")
+              for key, value in record.items():
+                logger.info(f"  │    {key:<35} : {value}")
+            logger.info(f"  └{'─'*71}┘")
+            logger.info(f"")
+
+            # ── INJECTION ────────────────────────────────────────────────
+            output_injection = data_inject_nse_main_database(data_received)
+
+            # ── OUTPUT BLOCK ─────────────────────────────────────────────
+            logger.info(f"  ┌─ CLEANED OUTPUT (INJECTED TO DB) {'─'*36}┐")
+            for i, record in enumerate(output_injection):
+              logger.info(f"  │  Record [{i+1}]")
+              for key, value in record.items():
+                logger.info(f"  │    {key:<35} : {value}")
+            logger.info(f"  └{'─'*71}┘")
+            logger.info(f"")
+
+            success_count += 1
+            last_updated = datetime.now(ZoneInfo("Asia/Kolkata"))
+            logger.info(f"  INJECTION     : ✓  COMMITTED TO price_metadata")
+            logger.info(f"  LAST UPDATED  : {last_updated.strftime('%d-%b-%Y %I:%M:%S %p')}")
+
           # Resetting the Dates
           start_date = rolling_date + timedelta(days=1)
-          # Ensure rolling_date doesn't exceed end_date
-          rolling_date = min(start_date + timedelta(days=3), end_date) #Takes closer date - end date or the +30 days date
+          rolling_date = min(start_date + timedelta(days=30), end_date)
 
           if rolling_date != end_date:
-            #Randomized Break
-            next_request_wait = random.uniform(1, 10)
-            print(f"Wait: {next_request_wait} Seconds")
-            time.sleep(next_request_wait)
-            print("")
+            sleeping_time = random.uniform(1, 10)
+            logger.info(f"  WAIT          : {sleeping_time:.4f} Seconds")
+            time.sleep(sleeping_time)
+          
+          logger.info(f"")
 
         elif output_nse_main_data_fetch.get("response_code") != 200:
-          print(f"Response Code: {output_nse_main_data_fetch.get("response_code")}")
-          print("Data Fetch Failed!")
+          failed_count += 1
+          logger.info(f"  STATUS        : ✗  FETCH FAILED")
+          logger.info(f"  ERROR CODE    : {output_nse_main_data_fetch.get('response_code')}")
+          logger.info(f"  ACTION        : PROCESS ABORTED")
+          logger.info(f"")
           break
 
-      print(f"Primary Data Source: NSE INDIA")
+      # ── UPDATE index_metadata ────────────────────────────────────────────
       source = "NSE INDIA"
-      print(f"Index Long Name: {output_index_name_fetcher.get("index_long_name")}")
-
       query = text("UPDATE index_metadata SET source = :source, last_updated_time = :last_updated_time, data_origin_date = :data_origin_date WHERE index_id = :index_id")
-      conn.execute(query, {"source":source,"index_id":index_id,"last_updated_time":datetime.now(ZoneInfo("Asia/Kolkata")).replace(tzinfo=None), "data_origin_date":origin_date}) #tzinfo stores that part of time which tells us the timezone by setting it None, we remove that part so clean date and time goes into the table
+      conn.execute(query, {"source":source, "index_id":index_id, "last_updated_time":datetime.now(ZoneInfo("Asia/Kolkata")), "data_origin_date":origin_date})
       conn.commit()
-      print("Updated index_metadata Cleanly!")
-      print("")
+      logger.info(f"  METADATA      : ✓  index_metadata Updated (source, last_updated_time, data_origin_date)")
+      logger.info(f"")
 
     elif data_source == "NIFTY INDICES":
 
-      #Setting up the environment just for one time and then utilizing it to hit API again and again
+      logger.info(f"  STEP 7        : Setting up NIFTY INDICES session & cookies...")
+      output_environment_setup_nifty_indices = environment_setup_nifty_indices()
       session = output_environment_setup_nifty_indices.get("session")
       headers = output_environment_setup_nifty_indices.get("headers")
       url = output_environment_setup_nifty_indices.get("url")
+      logger.info(f"  SESSION       : ✓  NIFTY INDICES session initialized")
+      logger.info(f"  USER AGENT    : {output_user_agent_and_impersonates_selection.get('impersonate_choice')}")
+      logger.info(f"")
+      logger.info(f"  STEP 8        : Beginning rolling batch ingestion from NIFTY INDICES...")
+      logger.info(f"")
 
       while start_date <= rolling_date:
 
-        # Preparing Dates in acceptable formats
-        acceptable_start_date = start_date.strftime("%d-%b-%Y") #For Nifty Indices Start Date
-        acceptable_rolling_date = rolling_date.strftime("%d-%b-%Y") #For Nifty Indices Rolling Date
-        print(f"Date to pass: {acceptable_start_date} and {acceptable_rolling_date}")
+        batch_number += 1
+        acceptable_start_date = start_date.strftime("%d-%b-%Y")
+        acceptable_rolling_date = rolling_date.strftime("%d-%b-%Y")
+
+        logger.info(f"┌──────────────────────────────────────────────────────────────────────┐")
+        logger.info(f"│  BATCH        : #{str(batch_number):<53}│")
+        logger.info(f"│  WINDOW START : {acceptable_start_date:<54}│")
+        logger.info(f"│  WINDOW END   : {acceptable_rolling_date:<54}│")
+        logger.info(f"│  SOURCE       : NIFTY INDICES                                        │")
+        logger.info(f"└──────────────────────────────────────────────────────────────────────┘")
 
         output_nifty_indices_data_fetch = nifty_indices_data_fetch(acceptable_start_date, acceptable_rolling_date)
     
         if output_nifty_indices_data_fetch.get("response_code") == 200:
 
-          #Data Injection Code here
-          print(f"{start_date} to {rolling_date}")
-          print(f"Data: {output_nifty_indices_data_fetch.get("data")}")
-          print("")
-          data_inject_nifty_indices_database(output_nifty_indices_data_fetch.get("data"))
-          
+          data_received = output_nifty_indices_data_fetch.get("data")
+
+          if data_received is None or len(data_received) == 0:
+
+            skipped_count += 1
+            logger.info(f"  STATUS        : ⚠  DATA IS EMPTY / NONE — BATCH SKIPPED")
+            logger.info(f"  RESPONSE CODE : 200 (No Records in Window)")
+            logger.info(f"")
+
+          else:
+
+            logger.info(f"  STATUS        : ✓  DATA RECEIVED — RESPONSE 200")
+            logger.info(f"  RECORDS FOUND : {len(data_received)}")
+            logger.info(f"")
+
+            # ── INPUT BLOCK ──────────────────────────────────────────────
+            logger.info(f"  ┌─ RAW INPUT FROM NIFTY INDICES {'─'*39}┐")
+            for i, record in enumerate(data_received):
+              logger.info(f"  │  Record [{i+1}]")
+              for key, value in record.items():
+                logger.info(f"  │    {key:<35} : {value}")
+            logger.info(f"  └{'─'*71}┘")
+            logger.info(f"")
+
+            # ── INJECTION ────────────────────────────────────────────────
+            output_injection = data_inject_nifty_indices_database(data_received)
+
+            # ── OUTPUT BLOCK ─────────────────────────────────────────────
+            logger.info(f"  ┌─ CLEANED OUTPUT (INJECTED TO DB) {'─'*36}┐")
+            for i, record in enumerate(output_injection):
+              logger.info(f"  │  Record [{i+1}]")
+              for key, value in record.items():
+                logger.info(f"  │    {key:<35} : {value}")
+            logger.info(f"  └{'─'*71}┘")
+            logger.info(f"")
+
+            success_count += 1
+            last_updated = datetime.now(ZoneInfo("Asia/Kolkata"))
+            logger.info(f"  INJECTION     : ✓  COMMITTED TO price_metadata")
+            logger.info(f"  LAST UPDATED  : {last_updated.strftime('%d-%b-%Y %I:%M:%S %p')}")
+
           # Resetting the Dates
           start_date = rolling_date + timedelta(days=1)
-          # Ensure rolling_date doesn't exceed end_date
-          rolling_date = min(start_date + timedelta(days=3), end_date) #Takes closer date - end date or the +30 days date
+          rolling_date = min(start_date + timedelta(days=30), end_date)
 
           if rolling_date != end_date:
-            #Randomized Break
-            next_request_wait = random.uniform(1, 10)
-            print(f"Wait: {next_request_wait} Seconds")
-            time.sleep(next_request_wait)
-            print("")
+            sleeping_time = random.uniform(1, 10)
+            logger.info(f"  WAIT          : {sleeping_time:.4f} Seconds")
+            time.sleep(sleeping_time)
+          
+          logger.info(f"")
       
         elif output_nifty_indices_data_fetch.get("response_code") != 200:
-          print(f"Response Code: {output_nifty_indices_data_fetch.get("response_code")}")
-          print("Data Fetch Failed!")
+          failed_count += 1
+          logger.info(f"  STATUS        : ✗  FETCH FAILED")
+          logger.info(f"  ERROR CODE    : {output_nifty_indices_data_fetch.get('response_code')}")
+          logger.info(f"  ACTION        : PROCESS ABORTED")
+          logger.info(f"")
           break
 
-      print(f"Data Source: NIFTY INDICES")
+      # ── UPDATE index_metadata ────────────────────────────────────────────
       source = "NIFTY INDICES"
-      print(f"Index Long Name: {output_index_name_fetcher.get("index_long_name")}")
-
       query = text("UPDATE index_metadata SET source = :source, last_updated_time = :last_updated_time, data_origin_date = :data_origin_date WHERE index_id = :index_id")
-      conn.execute(query, {"source":source,"index_id":index_id,"last_updated_time":datetime.now(ZoneInfo("Asia/Kolkata")).replace(tzinfo=None), "data_origin_date":origin_date})
+      conn.execute(query, {"source":source, "index_id":index_id, "last_updated_time":datetime.now(ZoneInfo("Asia/Kolkata")), "data_origin_date":origin_date})
       conn.commit()
-      print("Updated index_metadata Cleanly!")
-      print("Data Injected via NIFTY INDICES!")
-      print("")
-    
+      logger.info(f"  METADATA      : ✓  index_metadata Updated (source, last_updated_time, data_origin_date)")
+      logger.info(f"")
+
+  # ── FINAL SUMMARY ──────────────────────────────────────────────────────────
+  end_time = dt.now()
+  total_duration = end_time - start_time
+  total_seconds = int(total_duration.total_seconds())
+  hours = total_seconds // 3600
+  minutes = (total_seconds % 3600) // 60
+  seconds = total_seconds % 60
+
+  logger.info(f"")
+  logger.info(f"╔══════════════════════════════════════════════════════════════════════╗")
+  logger.info(f"║                         EXECUTION SUMMARY                            ║")
+  logger.info(f"╠══════════════════════════════════════════════════════════════════════╣")
+  logger.info(f"║  INDEX ID      : {str(index_id):<52}║")
+  logger.info(f"║  INDEX NAME    : {output_index_name_fetcher.get('index_long_name'):<52}║")
+  logger.info(f"║  DATA SOURCE   : {data_source:<52}║")
+  logger.info(f"╠══════════════════════════════════════════════════════════════════════╣")
+  logger.info(f"║  COMPLETED AT  : {dt.now().strftime('%d-%b-%Y %I:%M:%S %p'):<52}║")
+  logger.info(f"║  TIME TAKEN    : {f'{hours}h {minutes}m {seconds}s':<52}║")
+  logger.info(f"╠══════════════════════════════════════════════════════════════════════╣")
+  logger.info(f"║  TOTAL BATCHES : {str(batch_number):<52}║")
+  logger.info(f"║  ✓  INJECTED   : {str(success_count):<52}║")
+  logger.info(f"║  ⚠  SKIPPED    : {str(skipped_count):<52}║")
+  logger.info(f"║  ✗  FAILED     : {str(failed_count):<52}║")
+  logger.info(f"╠══════════════════════════════════════════════════════════════════════╣")
+  if failed_count == 0 and skipped_count == 0:
+    logger.info(f"║  RESULT        : ✓  ALL BATCHES COMPLETED SUCCESSFULLY               ║")
+  elif failed_count > 0:
+    logger.info(f"║  RESULT        : ✗  PROCESS ENCOUNTERED FAILURES — REVIEW LOGS       ║")
+  else:
+    logger.info(f"║  RESULT        : ⚠  COMPLETED WITH SKIPPED WINDOWS                   ║")
+  logger.info(f"╚══════════════════════════════════════════════════════════════════════╝")
+  logger.info(f"")
+
 elif proceed == 0:
-  print("Process Aborted!")
+  logger.info(f"  ACTION        : ✗  USER ABORTED — Process terminated by user input.")
+  logger.info(f"")
   sys.exit()
-  

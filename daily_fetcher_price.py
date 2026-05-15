@@ -20,14 +20,10 @@ load_dotenv()
 
 # Logging Script
 
-log_folder = r"C:\Users\Riddhima Singh\Desktop\Index Value Strategy\daily_fetch_data_logs"
-log_filename = os.path.join(log_folder, f"price_fetch_log_{dt.now().strftime('%Y-%m-%d_%H-%M-%S')}.txt")
-
 logging.basicConfig(
     level=logging.INFO,
     format="%(message)s",
     handlers=[
-        logging.FileHandler(log_filename, encoding="utf-8"),
         logging.StreamHandler()
     ]
 )
@@ -310,7 +306,7 @@ def data_inject_nse_main_database(data_nse_value, index_id):
       
     #Finally Pushing Whole Data into the Database
     query = text("INSERT INTO price_metadata (index_id, trade_date, open_price, high_price, low_price, close_price, last_updated_time, shares_traded, turnover_inr_cr) VALUES (:index_id, :trade_date, :open_price, :high_price, :low_price, :close_price, :last_updated_time, :shares_traded, :turnover_inr_cr)")
-    conn.execute(query, {"index_id":index_id, "trade_date":date_program_formatted_datetime_onlydate, "open_price":open_index_value, "high_price":high_index_value, "low_price":low_index_value, "close_price":close_index_value, "last_updated_time":datetime.now(ZoneInfo("Asia/Kolkata")).replace(tzinfo=None), "shares_traded":shares_traded_number, "turnover_inr_cr":turnover_inr_cr_value})
+    conn.execute(query, {"index_id":index_id, "trade_date":date_program_formatted_datetime_onlydate, "open_price":open_index_value, "high_price":high_index_value, "low_price":low_index_value, "close_price":close_index_value, "last_updated_time":datetime.now(ZoneInfo("Asia/Kolkata")), "shares_traded":shares_traded_number, "turnover_inr_cr":turnover_inr_cr_value})
     conn.commit()
 
   return data_nse_value
@@ -397,7 +393,7 @@ with output_database_engine_connection.connect() as conn:
           logger.info(f"")
 
           success_count += 1
-          last_updated = datetime.now(ZoneInfo("Asia/Kolkata")).replace(tzinfo=None)
+          last_updated = datetime.now(ZoneInfo("Asia/Kolkata"))
           logger.info(f"  INJECTION     : ✓  COMMITTED TO price_metadata")
           logger.info(f"  LAST UPDATED  : {last_updated.strftime('%d-%b-%Y %I:%M:%S %p')}")
         
