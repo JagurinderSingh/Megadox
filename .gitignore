@@ -1,6 +1,6 @@
 # Files Ignored
 .env
 .venv
-daily_fetch_data_logs
 venv
-data_ingestion_logs
+tempCodeRunnerFile.py
+
