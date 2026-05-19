@@ -173,84 +173,77 @@ print(f"Index Long Name: {output_index_name_fetcher.get("index_long_name")}")
 data_source = "NSE INDIA"
 print("")
 
-proceed = int(input("Enter 1 to Proceed and 0 to Abort: ")) #Green Flag Validation
+# Input Starting Date
+starting_day = int(input("Enter Starting Day: "))
+starting_month = int(input("Enter Starting Month: "))
+starting_year = int(input("Enter Starting Year: "))
+start_date = datetime(starting_year, starting_month, starting_day)
+origin_date = start_date
 print("")
 
-if proceed == 1:
+# Input Ending Date
+ending_day = int(input("Enter Ending Day: "))
+ending_month = int(input("Enter Ending Month: "))
+ending_year = int(input("Enter Ending Year: "))
+end_date = datetime(ending_year, ending_month, ending_day)
+print("")
 
-  # Input Starting Date
-  starting_day = int(input("Enter Starting Day: "))
-  starting_month = int(input("Enter Starting Month: "))
-  starting_year = int(input("Enter Starting Year: "))
-  start_date = datetime(starting_year, starting_month, starting_day)
-  origin_date = start_date
+# Rolling Date Calculation
+rolling_date = start_date + timedelta(days=30)
+print("")
+
+with output_database_engine_connection.connect() as conn:
+  print("Connection Established Successfully!")
   print("")
 
-  # Input Ending Date
-  ending_day = int(input("Enter Ending Day: "))
-  ending_month = int(input("Enter Ending Month: "))
-  ending_year = int(input("Enter Ending Year: "))
-  end_date = datetime(ending_year, ending_month, ending_day)
-  print("")
+  #Setting up the environment just for one time and then utilizing it to hit API again and again
+  session = output_environment_setup_nse_main.get("session")
+  headers = output_environment_setup_nse_main.get("headers")
 
-  # Rolling Date Calculation
-  rolling_date = start_date + timedelta(days=30)
-  print("")
+  #Pushing Actual Data
 
-  with output_database_engine_connection.connect() as conn:
-    print("Connection Established Successfully!")
-    print("")
+  while start_date <= rolling_date:
 
-    #Setting up the environment just for one time and then utilizing it to hit API again and again
-    session = output_environment_setup_nse_main.get("session")
-    headers = output_environment_setup_nse_main.get("headers")
+    # Preparing Dates in acceptable formats
+    acceptable_start_date = start_date.strftime("%d-%m-%Y") #For NSE Main Start Date
+    acceptable_rolling_date = rolling_date.strftime("%d-%m-%Y") #For NSE Main Rolling Date
 
-    #Pushing Actual Data
+    output_nse_main_data_fetch = nse_main_data_fetch(acceptable_start_date, acceptable_rolling_date)
+  
+    if output_nse_main_data_fetch.get("response_code") == 200:
 
-    while start_date <= rolling_date:
+      #Data Injection Code here
+      print(f"{start_date} to {rolling_date}")
+      print(f"Data: {output_nse_main_data_fetch.get("data")}")
+      print("")
+      data_inject_nse_main_database(output_nse_main_data_fetch.get("data"))
+        
+      # Resetting the Dates
+      start_date = rolling_date + timedelta(days=1)
+      # Ensure rolling_date doesn't exceed end_date
+      rolling_date = min(start_date + timedelta(days=30), end_date) #Takes closer date - end date or the +30 days date
 
-      # Preparing Dates in acceptable formats
-      acceptable_start_date = start_date.strftime("%d-%m-%Y") #For NSE Main Start Date
-      acceptable_rolling_date = rolling_date.strftime("%d-%m-%Y") #For NSE Main Rolling Date
-
-      output_nse_main_data_fetch = nse_main_data_fetch(acceptable_start_date, acceptable_rolling_date)
-    
-      if output_nse_main_data_fetch.get("response_code") == 200:
-
-        #Data Injection Code here
-        print(f"{start_date} to {rolling_date}")
-        print(f"Data: {output_nse_main_data_fetch.get("data")}")
+      if rolling_date != end_date:
+        #Randomized Break
+        next_request_wait = random.uniform(1, 10)
+        print(f"Wait: {next_request_wait} Seconds")
+        time.sleep(next_request_wait)
         print("")
-        data_inject_nse_main_database(output_nse_main_data_fetch.get("data"))
-          
-        # Resetting the Dates
-        start_date = rolling_date + timedelta(days=1)
-        # Ensure rolling_date doesn't exceed end_date
-        rolling_date = min(start_date + timedelta(days=30), end_date) #Takes closer date - end date or the +30 days date
 
-        if rolling_date != end_date:
-          #Randomized Break
-          next_request_wait = random.uniform(1, 10)
-          print(f"Wait: {next_request_wait} Seconds")
-          time.sleep(next_request_wait)
-          print("")
+    elif output_nse_main_data_fetch.get("response_code") != 200:
+      print(f"Response Code: {output_nse_main_data_fetch.get("response_code")}")
+      print("Data Fetch Failed!")
+      sys.exit()
+      break
 
-      elif output_nse_main_data_fetch.get("response_code") != 200:
-        print(f"Response Code: {output_nse_main_data_fetch.get("response_code")}")
-        print("Data Fetch Failed!")
-        break
+  print(f"Primary Data Source: NSE INDIA")
+  source = "NSE INDIA"
+  print(f"Index Long Name: {output_index_name_fetcher.get("index_long_name")}")
 
-    print(f"Primary Data Source: NSE INDIA")
-    source = "NSE INDIA"
-    print(f"Index Long Name: {output_index_name_fetcher.get("index_long_name")}")
+  query = text("UPDATE index_metadata SET source = :source, last_updated_time = :last_updated_time, data_origin_date = :data_origin_date WHERE index_id = :index_id")
+  conn.execute(query, {"source":source,"index_id":index_id,"last_updated_time":datetime.now(ZoneInfo("Asia/Kolkata")), "data_origin_date":origin_date}) #tzinfo stores that part of time which tells us the timezone by setting it None, we remove that part so clean date and time goes into the table
+  conn.commit()
+  print("Updated index_metadata Cleanly!")
+  print("")
 
-    query = text("UPDATE index_metadata SET source = :source, last_updated_time = :last_updated_time, data_origin_date = :data_origin_date WHERE index_id = :index_id")
-    conn.execute(query, {"source":source,"index_id":index_id,"last_updated_time":datetime.now(ZoneInfo("Asia/Kolkata")), "data_origin_date":origin_date}) #tzinfo stores that part of time which tells us the timezone by setting it None, we remove that part so clean date and time goes into the table
-    conn.commit()
-    print("Updated index_metadata Cleanly!")
-    print("")
-
-elif proceed == 0:
-  print("Process Aborted!")
-  sys.exit()
   
