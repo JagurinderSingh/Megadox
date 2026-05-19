@@ -18,6 +18,20 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+# ── LOGGING SETUP ────────────────────────────────────────────────────────────
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(message)s",
+    handlers=[
+        logging.StreamHandler()
+    ]
+)
+
+logger = logging.getLogger(__name__)
+
+# ─────────────────────────────────────────────────────────────────────────────
+
 #For Null Values Check
 empty_data_list = [None, "None", "0", 0, "-", "NaN", "Null", "NULL", "null", "none", "nan"] #Used only during data cleaning
 
@@ -28,8 +42,6 @@ def database_engine_connection():
   DB_URL = f"postgresql://postgres:{database_password}@localhost:5432/index_value_strategy"
   engine = create_engine(DB_URL)
   return engine
-
-output_database_engine_connection = database_engine_connection()
 
 def today_date_fetch():
 
@@ -131,7 +143,8 @@ def data_inject_nse_main_database(data_nse_value):
   adv_dec_ratio_value = round((advances_value/declines_value),2)
       
   if advances_value is None and declines_value is None and adv_dec_ratio_value is None:
-    print("All Data is None!")
+    logger.info(f"  STATUS        : ✗  ALL DATA IS NONE — PROCESS ABORTED")
+    logger.info(f"")
     sys.exit()
     
   #Finally Pushing Whole Data into the Database
@@ -139,20 +152,61 @@ def data_inject_nse_main_database(data_nse_value):
   conn.execute(query, {"trade_date":date_program_formatted_datetime,"advances": advances_value, "declines":declines_value, "advance_decline_ratio":adv_dec_ratio_value, "last_updated_time":datetime.now(ZoneInfo("Asia/Kolkata"))})
   conn.commit()
 
+  return data_nse_value
+
+# ── STARTUP BANNER ───────────────────────────────────────────────────────────
+
+logger.info(f"")
+logger.info(f"╔══════════════════════════════════════════════════════════════════════╗")
+logger.info(f"║       ADVANCE DECLINE DAILY DATA FETCHER — EXECUTION LOG             ║")
+logger.info(f"╠══════════════════════════════════════════════════════════════════════╣")
+logger.info(f"║  RUN TIMESTAMP : {dt.now().strftime('%d-%b-%Y %I:%M:%S %p'):<52}║")
+logger.info(f"║  SCRIPT        : adv_dec_daily_fetcher.py                            ║")
+logger.info(f"║  PURPOSE       : Today's Live Advance Decline Injection               ║")
+logger.info(f"║  TRADE DATE    : {today_date:<52}║")
+logger.info(f"║  TARGET TABLE  : advance_decline_metadata                             ║")
+logger.info(f"╚══════════════════════════════════════════════════════════════════════╝")
+logger.info(f"")
+
+# ─────────────────────────────────────────────────────────────────────────────
+
 # Data Source
 data_source = "NSE INDIA"
-print("")
+
+logger.info(f"  STEP 1        : Establishing database engine connection...")
+output_database_engine_connection = database_engine_connection()
+logger.info(f"  DB ENGINE     : ✓  Connected to index_value_strategy")
+logger.info(f"")
+
+logger.info(f"  STEP 2        : Setting up NSE INDIA session & cookies...")
+logger.info(f"  SESSION       : ✓  NSE INDIA session initialized")
+logger.info(f"  USER AGENT    : {output_user_agent_and_impersonates_selection.get('impersonate_choice')}")
+logger.info(f"")
+
+logger.info(f"┌──────────────────────────────────────────────────────────────────────┐")
+logger.info(f"│                         INGESTION PARAMETERS                         │")
+logger.info(f"├──────────────────────────────────────────────────────────────────────┤")
+logger.info(f"│  DATA SOURCE  : NSE INDIA (Fixed)                                    │")
+logger.info(f"│  TRADE DATE   : {today_date:<54}│")
+logger.info(f"│  MODE         : Daily (Single Shot — No Loop)                        │")
+logger.info(f"│  ENDPOINT     : /api/live-analysis-advance                           │")
+logger.info(f"└──────────────────────────────────────────────────────────────────────┘")
+logger.info(f"")
+
+start_time = dt.now()
 
 with output_database_engine_connection.connect() as conn:
 
-  print("Connection Established Successfully!")
-  print("")
+  logger.info(f"  DB CONN       : ✓  Connection Established Successfully")
+  logger.info(f"")
 
   #Setting up the environment just for one time and then utilizing it to hit API again and again
   session = output_environment_setup_nse_main.get("session")
   headers = output_environment_setup_nse_main.get("headers")
 
   #Pushing Actual Data
+  logger.info(f"  STEP 3        : Fetching live advance decline data from NSE INDIA...")
+  logger.info(f"")
   output_nse_main_data_fetch = nse_main_data_fetch()
     
   if output_nse_main_data_fetch.get("response_code") == 200:
@@ -161,15 +215,66 @@ with output_database_engine_connection.connect() as conn:
     all_data = output_nse_main_data_fetch.get("data")
     all_advance_data = all_data.get("advance")
     all_advance_data_count = all_advance_data.get("count")
-  
-    #Showing the Data
-    print(f"Data: {all_advance_data_count}")
+
+    logger.info(f"  STATUS        : ✓  DATA RECEIVED — RESPONSE 200")
+    logger.info(f"")
+
+    # ── INPUT BLOCK ──────────────────────────────────────────────────────────
+    logger.info(f"  ┌─ RAW INPUT FROM NSE INDIA (advance → count) {'─'*25}┐")
+    for key, value in all_advance_data_count.items():
+      logger.info(f"  │    {key:<35} : {value}")
+    logger.info(f"  └{'─'*71}┘")
+    logger.info(f"")
 
     #Final Data Injection
-    data_inject_nse_main_database(all_advance_data_count)
+    output_injection = data_inject_nse_main_database(all_advance_data_count)
+
+    # ── OUTPUT BLOCK — only the 5 fields going into the DB ───────────────────
+    date_for_display = datetime.strptime(today_date, "%d-%m-%Y").strftime("%Y-%m-%d")
+    advances_display = output_injection.get("Advances")
+    declines_display = output_injection.get("Declines")
+    ratio_display = round((advances_display / declines_display), 2)
+    last_updated_display = datetime.now(ZoneInfo("Asia/Kolkata")).strftime("%d-%b-%Y %I:%M:%S %p")
+
+    logger.info(f"  ┌─ CLEANED OUTPUT (INJECTED TO DB) {'─'*36}┐")
+    logger.info(f"  │    {'trade_date':<35} : {date_for_display}")
+    logger.info(f"  │    {'advances':<35} : {advances_display}")
+    logger.info(f"  │    {'declines':<35} : {declines_display}")
+    logger.info(f"  │    {'advance_decline_ratio':<35} : {ratio_display}")
+    logger.info(f"  │    {'last_updated_time':<35} : {last_updated_display}")
+    logger.info(f"  └{'─'*71}┘")
+    logger.info(f"")
+
+    last_updated = datetime.now(ZoneInfo("Asia/Kolkata"))
+    logger.info(f"  INJECTION     : ✓  COMMITTED TO advance_decline_metadata")
+    logger.info(f"  LAST UPDATED  : {last_updated.strftime('%d-%b-%Y %I:%M:%S %p')}")
+    logger.info(f"")
 
   elif output_nse_main_data_fetch.get("response_code") != 200:
-    print(f"Response Code: {output_nse_main_data_fetch.get("response_code")}")
-    print("Data Fetch Failed!")
-    print("Process Aborted!")
+    logger.info(f"  STATUS        : ✗  FETCH FAILED")
+    logger.info(f"  ERROR CODE    : {output_nse_main_data_fetch.get('response_code')}")
+    logger.info(f"  ACTION        : PROCESS ABORTED")
+    logger.info(f"")
     sys.exit()
+
+# ── FINAL SUMMARY ─────────────────────────────────────────────────────────────
+end_time = dt.now()
+total_duration = end_time - start_time
+total_seconds = int(total_duration.total_seconds())
+hours = total_seconds // 3600
+minutes = (total_seconds % 3600) // 60
+seconds = total_seconds % 60
+
+logger.info(f"╔══════════════════════════════════════════════════════════════════════╗")
+logger.info(f"║                         EXECUTION SUMMARY                            ║")
+logger.info(f"╠══════════════════════════════════════════════════════════════════════╣")
+logger.info(f"║  DATA SOURCE   : NSE INDIA                                           ║")
+logger.info(f"║  TRADE DATE    : {today_date:<52}║")
+logger.info(f"║  TARGET TABLE  : advance_decline_metadata                             ║")
+logger.info(f"╠══════════════════════════════════════════════════════════════════════╣")
+logger.info(f"║  COMPLETED AT  : {dt.now().strftime('%d-%b-%Y %I:%M:%S %p'):<52}║")
+logger.info(f"║  TIME TAKEN    : {f'{hours}h {minutes}m {seconds}s':<52}║")
+logger.info(f"╠══════════════════════════════════════════════════════════════════════╣")
+logger.info(f"║  RESULT        : ✓  DAILY INJECTION COMPLETED SUCCESSFULLY            ║")
+logger.info(f"╚══════════════════════════════════════════════════════════════════════╝")
+logger.info(f"")

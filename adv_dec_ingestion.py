@@ -13,11 +13,42 @@ import sys
 from zoneinfo import ZoneInfo
 from dotenv import load_dotenv
 import os
+import logging
+from datetime import datetime as dt
 
 load_dotenv()
 
+# ── LOGGING SETUP ────────────────────────────────────────────────────────────
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(message)s",
+    handlers=[
+        logging.StreamHandler()
+    ]
+)
+
+logger = logging.getLogger(__name__)
+
+# ─────────────────────────────────────────────────────────────────────────────
+
 #For Null Values Check
 empty_data_list = [None, "None", "0", 0, "-", "NaN", "Null", "NULL", "null", "none", "nan"] #Used only during data cleaning
+
+# ── STARTUP BANNER ───────────────────────────────────────────────────────────
+
+logger.info(f"")
+logger.info(f"╔══════════════════════════════════════════════════════════════════════╗")
+logger.info(f"║      ADVANCE DECLINE HISTORICAL DATA INGESTION — EXECUTION LOG       ║")
+logger.info(f"╠══════════════════════════════════════════════════════════════════════╣")
+logger.info(f"║  RUN TIMESTAMP : {dt.now().strftime('%d-%b-%Y %I:%M:%S %p'):<52}║")
+logger.info(f"║  SCRIPT        : adv_dec_ingestion.py                                ║")
+logger.info(f"║  PURPOSE       : Market-Wide Advance Decline Monthly Ingestion        ║")
+logger.info(f"║  TARGET TABLE  : advance_decline_metadata                             ║")
+logger.info(f"╚══════════════════════════════════════════════════════════════════════╝")
+logger.info(f"")
+
+# ─────────────────────────────────────────────────────────────────────────────
 
 def database_engine_connection():
 
@@ -27,7 +58,10 @@ def database_engine_connection():
   engine = create_engine(DB_URL)
   return engine
 
+logger.info(f"  STEP 1        : Establishing database engine connection...")
 output_database_engine_connection = database_engine_connection()
+logger.info(f"  DB ENGINE     : ✓  Connected to index_value_strategy")
+logger.info(f"")
 
 def user_agent_and_impersonates_selection():
 
@@ -80,7 +114,7 @@ output_environment_setup_nse_main = environment_setup_nse_main()
 def nse_main_data_fetch(iteration_item):
     
     url = f"https://www.nseindia.com/api/historicalOR/advances-decline-monthly?year={iteration_item}"
-    print(url)
+    logger.info(f"  URL           : {url}")
     response = output_environment_setup_nse_main.get("session").get(url, headers = output_environment_setup_nse_main.get("headers"), impersonate = output_user_agent_and_impersonates_selection.get("impersonate_choice"), timeout=10)
     data_nse = response.json()
     data = data_nse.get("data")
@@ -139,9 +173,17 @@ def data_inject_nse_main_database(data_nse_value):
     conn.execute(query, {"trade_date":date_program_formatted_datetime_onlydate,"advances": advances_value, "declines":declines_value, "advance_decline_ratio":adv_dec_ratio_value, "last_updated_time":datetime.now(ZoneInfo("Asia/Kolkata"))})
     conn.commit()
 
+  return data_nse_value
+
+# ─────────────────────────────────────────────────────────────────────────────
+
 # Data Source
 data_source = "NSE INDIA"
-print("")
+
+logger.info(f"  STEP 2        : Setting up NSE INDIA session & cookies...")
+logger.info(f"  SESSION       : ✓  NSE INDIA session initialized")
+logger.info(f"  USER AGENT    : {output_user_agent_and_impersonates_selection.get('impersonate_choice')}")
+logger.info(f"")
 
 #Months
 months_list = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV", "DEC"]
@@ -149,15 +191,15 @@ months_list = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV"
 #Years
 years_list = []
 
+logger.info(f"  STEP 3        : Awaiting date range input from user...")
+
 # Input Starting Month and Year
 starting_month = str(input("Enter Starting Month (First Three Letters of Month): "))
 starting_year = int(input("Enter Starting Year: "))
-print("")
 
 # Input Ending Month and Year
 ending_month = str(input("Enter Ending Month (First Three Letters of Month): "))
 ending_year = int(input("Enter Ending Year: "))
-print("")
 
 #Building Years List
 years_list.append(starting_year)
@@ -197,9 +239,31 @@ else:
     for month in range (0, ending_month_index+1):
       compiled_list.append(f"{months_list[month]}-{years_list[year]}")
 
+logger.info(f"")
+logger.info(f"┌──────────────────────────────────────────────────────────────────────┐")
+logger.info(f"│                         INGESTION PARAMETERS                         │")
+logger.info(f"├──────────────────────────────────────────────────────────────────────┤")
+logger.info(f"│  DATA SOURCE   : NSE INDIA (Fixed)                                   │")
+logger.info(f"│  START         : {starting_month}-{starting_year:<52}│")
+logger.info(f"│  END           : {ending_month}-{ending_year:<53}│")
+logger.info(f"│  TOTAL MONTHS  : {str(len(compiled_list)):<54}│")
+logger.info(f"│  COMPILED LIST : {str(compiled_list[:6])[1:-1] + (' ...' if len(compiled_list) > 6 else ''):<54}│")
+logger.info(f"└──────────────────────────────────────────────────────────────────────┘")
+logger.info(f"")
+
+# ── COUNTERS ─────────────────────────────────────────────────────────────────
+success_count = 0
+skipped_count = 0
+failed_count = 0
+iteration_number = 0
+start_time = dt.now()
+
 with output_database_engine_connection.connect() as conn:
-  print("Connection Established Successfully!")
-  print("")
+
+  logger.info(f"  DB CONN       : ✓  Connection Established Successfully")
+  logger.info(f"")
+  logger.info(f"  STEP 4        : Beginning month-by-month ingestion from NSE INDIA...")
+  logger.info(f"")
 
   #Setting up the environment just for one time and then utilizing it to hit API again and again
   session = output_environment_setup_nse_main.get("session")
@@ -209,24 +273,103 @@ with output_database_engine_connection.connect() as conn:
 
   for iteration_item in compiled_list:
 
+    iteration_number += 1
+
+    logger.info(f"┌──────────────────────────────────────────────────────────────────────┐")
+    logger.info(f"│  ITERATION    : #{str(iteration_number):<53}│")
+    logger.info(f"│  MONTH-YEAR   : {iteration_item:<54}│")
+    logger.info(f"│  PROGRESS     : {iteration_number} of {len(compiled_list)} months{'':<46}│")
+    logger.info(f"│  SOURCE       : NSE INDIA                                            │")
+    logger.info(f"└──────────────────────────────────────────────────────────────────────┘")
+
     output_nse_main_data_fetch = nse_main_data_fetch(iteration_item)
     
     if output_nse_main_data_fetch.get("response_code") == 200:
 
-      #Data Injection Code here
-      print(f"Data: {output_nse_main_data_fetch.get("data")}")
-      print("")
-      data_inject_nse_main_database(output_nse_main_data_fetch.get("data"))
+      data_received = output_nse_main_data_fetch.get("data")
+
+      if data_received is None or len(data_received) == 0:
+
+        skipped_count += 1
+        logger.info(f"  STATUS        : ⚠  DATA IS EMPTY / NONE — MONTH SKIPPED")
+        logger.info(f"  RESPONSE CODE : 200 (No Records for this Month)")
+        logger.info(f"")
+
+      else:
+
+        logger.info(f"  STATUS        : ✓  DATA RECEIVED — RESPONSE 200")
+        logger.info(f"  RECORDS FOUND : {len(data_received)}")
+        logger.info(f"")
+
+        # ── INPUT BLOCK ──────────────────────────────────────────────────────
+        logger.info(f"  ┌─ RAW INPUT FROM NSE INDIA {'─'*43}┐")
+        for i, record in enumerate(data_received):
+          logger.info(f"  │  Record [{i+1}]")
+          for key, value in record.items():
+            logger.info(f"  │    {key:<35} : {value}")
+        logger.info(f"  └{'─'*71}┘")
+        logger.info(f"")
+
+        # ── INJECTION ────────────────────────────────────────────────────────
+        output_injection = data_inject_nse_main_database(data_received)
+
+        # ── OUTPUT BLOCK ─────────────────────────────────────────────────────
+        logger.info(f"  ┌─ CLEANED OUTPUT (INJECTED TO DB) {'─'*36}┐")
+        for i, record in enumerate(output_injection):
+          logger.info(f"  │  Record [{i+1}]")
+          for key, value in record.items():
+            logger.info(f"  │    {key:<35} : {value}")
+        logger.info(f"  └{'─'*71}┘")
+        logger.info(f"")
+
+        success_count += 1
+        last_updated = datetime.now(ZoneInfo("Asia/Kolkata"))
+        logger.info(f"  INJECTION     : ✓  COMMITTED TO advance_decline_metadata")
+        logger.info(f"  LAST UPDATED  : {last_updated.strftime('%d-%b-%Y %I:%M:%S %p')}")
 
       #Randomized Break
       next_request_wait = random.uniform(1, 10)
-      print(f"Wait: {next_request_wait} Seconds")
+      logger.info(f"  WAIT          : {next_request_wait:.4f} Seconds")
       time.sleep(next_request_wait)
-      print("")
+      logger.info(f"")
 
     elif output_nse_main_data_fetch.get("response_code") != 200:
-      print(f"Response Code: {output_nse_main_data_fetch.get("response_code")}")
-      print("Data Fetch Failed!")
-      print("Process Aborted!")
+      failed_count += 1
+      logger.info(f"  STATUS        : ✗  FETCH FAILED")
+      logger.info(f"  ERROR CODE    : {output_nse_main_data_fetch.get('response_code')}")
+      logger.info(f"  ACTION        : PROCESS ABORTED")
+      logger.info(f"")
       sys.exit()
       break
+
+# ── FINAL SUMMARY ─────────────────────────────────────────────────────────────
+end_time = dt.now()
+total_duration = end_time - start_time
+total_seconds = int(total_duration.total_seconds())
+hours = total_seconds // 3600
+minutes = (total_seconds % 3600) // 60
+seconds = total_seconds % 60
+
+logger.info(f"")
+logger.info(f"╔══════════════════════════════════════════════════════════════════════╗")
+logger.info(f"║                         EXECUTION SUMMARY                            ║")
+logger.info(f"╠══════════════════════════════════════════════════════════════════════╣")
+logger.info(f"║  DATA SOURCE   : NSE INDIA                                           ║")
+logger.info(f"║  TARGET TABLE  : advance_decline_metadata                             ║")
+logger.info(f"╠══════════════════════════════════════════════════════════════════════╣")
+logger.info(f"║  COMPLETED AT  : {dt.now().strftime('%d-%b-%Y %I:%M:%S %p'):<52}║")
+logger.info(f"║  TIME TAKEN    : {f'{hours}h {minutes}m {seconds}s':<52}║")
+logger.info(f"╠══════════════════════════════════════════════════════════════════════╣")
+logger.info(f"║  TOTAL MONTHS  : {str(len(compiled_list)):<52}║")
+logger.info(f"║  ✓  INJECTED   : {str(success_count):<52}║")
+logger.info(f"║  ⚠  SKIPPED    : {str(skipped_count):<52}║")
+logger.info(f"║  ✗  FAILED     : {str(failed_count):<52}║")
+logger.info(f"╠══════════════════════════════════════════════════════════════════════╣")
+if failed_count == 0 and skipped_count == 0:
+  logger.info(f"║  RESULT        : ✓  ALL MONTHS COMPLETED SUCCESSFULLY                ║")
+elif failed_count > 0:
+  logger.info(f"║  RESULT        : ✗  PROCESS ENCOUNTERED FAILURES — REVIEW LOGS       ║")
+else:
+  logger.info(f"║  RESULT        : ⚠  COMPLETED WITH SKIPPED MONTHS                    ║")
+logger.info(f"╚══════════════════════════════════════════════════════════════════════╝")
+logger.info(f"")

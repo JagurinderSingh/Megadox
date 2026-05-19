@@ -14,13 +14,44 @@ import sys
 from zoneinfo import ZoneInfo
 from dotenv import load_dotenv
 import os
+import logging
+from datetime import datetime as dt
 
 load_dotenv()
+
+# ── LOGGING SETUP ────────────────────────────────────────────────────────────
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(message)s",
+    handlers=[
+        logging.StreamHandler()
+    ]
+)
+
+logger = logging.getLogger(__name__)
+
+# ─────────────────────────────────────────────────────────────────────────────
 
 #For Null Values Check
 empty_data_list = [None, "None", "0", 0, "-", "NaN", "Null", "NULL", "null", "none", "nan"] #Used only during data cleaning
 
 index_id = 136
+
+# ── STARTUP BANNER ───────────────────────────────────────────────────────────
+
+logger.info(f"")
+logger.info(f"╔══════════════════════════════════════════════════════════════════════╗")
+logger.info(f"║         INDIA VIX HISTORICAL DATA INGESTION — EXECUTION LOG          ║")
+logger.info(f"╠══════════════════════════════════════════════════════════════════════╣")
+logger.info(f"║  RUN TIMESTAMP : {dt.now().strftime('%d-%b-%Y %I:%M:%S %p'):<52}║")
+logger.info(f"║  SCRIPT        : vix_historical_data_fetch.py                        ║")
+logger.info(f"║  PURPOSE       : Bulk Historical VIX Ingestion (Rolling 30-Day)      ║")
+logger.info(f"║  INDEX ID      : {str(index_id):<52}║")
+logger.info(f"╚══════════════════════════════════════════════════════════════════════╝")
+logger.info(f"")
+
+# ─────────────────────────────────────────────────────────────────────────────
 
 def database_engine_connection():
 
@@ -30,7 +61,10 @@ def database_engine_connection():
   engine = create_engine(DB_URL)
   return engine
 
+logger.info(f"  STEP 1        : Establishing database engine connection...")
 output_database_engine_connection = database_engine_connection()
+logger.info(f"  DB ENGINE     : ✓  Connected to index_value_strategy")
+logger.info(f"")
 
 def index_name_fetcher(index_id):
   
@@ -46,8 +80,11 @@ def index_name_fetcher(index_id):
     encoded_index_long_name = urllib.parse.quote(index_long_name)
 
     return {"index_long_name":index_long_name}
-  
+
+logger.info(f"  STEP 2        : Fetching index metadata from database...")
 output_index_name_fetcher = index_name_fetcher(index_id)
+logger.info(f"  INDEX LONG    : {output_index_name_fetcher.get('index_long_name')}")
+logger.info(f"")
 
 def user_agent_and_impersonates_selection():
 
@@ -166,12 +203,29 @@ def data_inject_nse_main_database(data_nse_value):
     conn.execute(query, {"index_id":index_id, "trade_date":date_program_formatted_datetime_onlydate, "open_price":open_index_value, "high_price":high_index_value, "low_price":low_index_value, "close_price":close_index_value, "previous_close_price":previous_close_value, "points_change":points_change_value, "percentage_change":percentage_change_value, "last_updated_time":datetime.now(ZoneInfo("Asia/Kolkata"))})
     conn.commit()
 
-#Printing the Index Long Name to the user
-print(f"Index Long Name: {output_index_name_fetcher.get("index_long_name")}")
+  return data_nse_value
+
+# ── INDEX CONFIRMATION BOX ───────────────────────────────────────────────────
+
+logger.info(f"┌──────────────────────────────────────────────────────────────────────┐")
+logger.info(f"│                        INDEX CONFIRMATION                            │")
+logger.info(f"├──────────────────────────────────────────────────────────────────────┤")
+logger.info(f"│  INDEX ID     : {str(index_id):<54}│")
+logger.info(f"│  INDEX LONG   : {output_index_name_fetcher.get('index_long_name'):<54}│")
+logger.info(f"│  DATA SOURCE  : NSE INDIA (Fixed)                                    │")
+logger.info(f"│  TARGET TABLE : india_vix_metadata                                   │")
+logger.info(f"└──────────────────────────────────────────────────────────────────────┘")
+logger.info(f"")
 
 # Enter Data Source Choice
 data_source = "NSE INDIA"
-print("")
+
+logger.info(f"  STEP 3        : Setting up NSE INDIA session & cookies...")
+logger.info(f"  SESSION       : ✓  NSE INDIA session initialized")
+logger.info(f"  USER AGENT    : {output_user_agent_and_impersonates_selection.get('impersonate_choice')}")
+logger.info(f"")
+
+logger.info(f"  STEP 4        : Awaiting date range input from user...")
 
 # Input Starting Date
 starting_day = int(input("Enter Starting Day: "))
@@ -179,22 +233,40 @@ starting_month = int(input("Enter Starting Month: "))
 starting_year = int(input("Enter Starting Year: "))
 start_date = datetime(starting_year, starting_month, starting_day)
 origin_date = start_date
-print("")
 
 # Input Ending Date
 ending_day = int(input("Enter Ending Day: "))
 ending_month = int(input("Enter Ending Month: "))
 ending_year = int(input("Enter Ending Year: "))
 end_date = datetime(ending_year, ending_month, ending_day)
-print("")
 
 # Rolling Date Calculation
 rolling_date = start_date + timedelta(days=30)
-print("")
+
+logger.info(f"")
+logger.info(f"┌──────────────────────────────────────────────────────────────────────┐")
+logger.info(f"│                         INGESTION PARAMETERS                         │")
+logger.info(f"├──────────────────────────────────────────────────────────────────────┤")
+logger.info(f"│  DATA SOURCE  : NSE INDIA (Fixed)                                    │")
+logger.info(f"│  START DATE   : {start_date.strftime('%d-%b-%Y'):<54}│")
+logger.info(f"│  END DATE     : {end_date.strftime('%d-%b-%Y'):<54}│")
+logger.info(f"│  WINDOW SIZE  : 30 Days (Rolling)                                    │")
+logger.info(f"└──────────────────────────────────────────────────────────────────────┘")
+logger.info(f"")
+
+# ── COUNTERS ─────────────────────────────────────────────────────────────────
+success_count = 0
+skipped_count = 0
+failed_count = 0
+batch_number = 0
+start_time = dt.now()
 
 with output_database_engine_connection.connect() as conn:
-  print("Connection Established Successfully!")
-  print("")
+
+  logger.info(f"  DB CONN       : ✓  Connection Established Successfully")
+  logger.info(f"")
+  logger.info(f"  STEP 5        : Beginning rolling batch ingestion from NSE INDIA...")
+  logger.info(f"")
 
   #Setting up the environment just for one time and then utilizing it to hit API again and again
   session = output_environment_setup_nse_main.get("session")
@@ -204,20 +276,64 @@ with output_database_engine_connection.connect() as conn:
 
   while start_date <= rolling_date:
 
+    batch_number += 1
+
     # Preparing Dates in acceptable formats
     acceptable_start_date = start_date.strftime("%d-%m-%Y") #For NSE Main Start Date
     acceptable_rolling_date = rolling_date.strftime("%d-%m-%Y") #For NSE Main Rolling Date
+
+    logger.info(f"┌──────────────────────────────────────────────────────────────────────┐")
+    logger.info(f"│  BATCH        : #{str(batch_number):<53}│")
+    logger.info(f"│  WINDOW START : {acceptable_start_date:<54}│")
+    logger.info(f"│  WINDOW END   : {acceptable_rolling_date:<54}│")
+    logger.info(f"│  SOURCE       : NSE INDIA                                            │")
+    logger.info(f"└──────────────────────────────────────────────────────────────────────┘")
 
     output_nse_main_data_fetch = nse_main_data_fetch(acceptable_start_date, acceptable_rolling_date)
   
     if output_nse_main_data_fetch.get("response_code") == 200:
 
-      #Data Injection Code here
-      print(f"{start_date} to {rolling_date}")
-      print(f"Data: {output_nse_main_data_fetch.get("data")}")
-      print("")
-      data_inject_nse_main_database(output_nse_main_data_fetch.get("data"))
-        
+      data_received = output_nse_main_data_fetch.get("data")
+
+      if data_received is None or len(data_received) == 0:
+
+        skipped_count += 1
+        logger.info(f"  STATUS        : ⚠  DATA IS EMPTY / NONE — BATCH SKIPPED")
+        logger.info(f"  RESPONSE CODE : 200 (No Records in Window)")
+        logger.info(f"")
+
+      else:
+
+        logger.info(f"  STATUS        : ✓  DATA RECEIVED — RESPONSE 200")
+        logger.info(f"  RECORDS FOUND : {len(data_received)}")
+        logger.info(f"")
+
+        # ── INPUT BLOCK ────────────────────────────────────────────────────
+        logger.info(f"  ┌─ RAW INPUT FROM NSE INDIA {'─'*43}┐")
+        for i, record in enumerate(data_received):
+          logger.info(f"  │  Record [{i+1}]")
+          for key, value in record.items():
+            logger.info(f"  │    {key:<35} : {value}")
+        logger.info(f"  └{'─'*71}┘")
+        logger.info(f"")
+
+        # ── INJECTION ──────────────────────────────────────────────────────
+        output_injection = data_inject_nse_main_database(data_received)
+
+        # ── OUTPUT BLOCK ───────────────────────────────────────────────────
+        logger.info(f"  ┌─ CLEANED OUTPUT (INJECTED TO DB) {'─'*36}┐")
+        for i, record in enumerate(output_injection):
+          logger.info(f"  │  Record [{i+1}]")
+          for key, value in record.items():
+            logger.info(f"  │    {key:<35} : {value}")
+        logger.info(f"  └{'─'*71}┘")
+        logger.info(f"")
+
+        success_count += 1
+        last_updated = datetime.now(ZoneInfo("Asia/Kolkata"))
+        logger.info(f"  INJECTION     : ✓  COMMITTED TO india_vix_metadata")
+        logger.info(f"  LAST UPDATED  : {last_updated.strftime('%d-%b-%Y %I:%M:%S %p')}")
+
       # Resetting the Dates
       start_date = rolling_date + timedelta(days=1)
       # Ensure rolling_date doesn't exceed end_date
@@ -226,24 +342,60 @@ with output_database_engine_connection.connect() as conn:
       if rolling_date != end_date:
         #Randomized Break
         next_request_wait = random.uniform(1, 10)
-        print(f"Wait: {next_request_wait} Seconds")
+        logger.info(f"  WAIT          : {next_request_wait:.4f} Seconds")
         time.sleep(next_request_wait)
-        print("")
+
+      logger.info(f"")
 
     elif output_nse_main_data_fetch.get("response_code") != 200:
-      print(f"Response Code: {output_nse_main_data_fetch.get("response_code")}")
-      print("Data Fetch Failed!")
+      failed_count += 1
+      logger.info(f"  STATUS        : ✗  FETCH FAILED")
+      logger.info(f"  ERROR CODE    : {output_nse_main_data_fetch.get('response_code')}")
+      logger.info(f"  ACTION        : PROCESS ABORTED")
+      logger.info(f"")
       sys.exit()
       break
 
-  print(f"Primary Data Source: NSE INDIA")
+  # ── UPDATE index_metadata ────────────────────────────────────────────────
   source = "NSE INDIA"
-  print(f"Index Long Name: {output_index_name_fetcher.get("index_long_name")}")
-
   query = text("UPDATE index_metadata SET source = :source, last_updated_time = :last_updated_time, data_origin_date = :data_origin_date WHERE index_id = :index_id")
   conn.execute(query, {"source":source,"index_id":index_id,"last_updated_time":datetime.now(ZoneInfo("Asia/Kolkata")), "data_origin_date":origin_date}) #tzinfo stores that part of time which tells us the timezone by setting it None, we remove that part so clean date and time goes into the table
   conn.commit()
-  print("Updated index_metadata Cleanly!")
-  print("")
+  logger.info(f"  METADATA      : ✓  index_metadata Updated (source, last_updated_time, data_origin_date)")
+  logger.info(f"")
+
+# ── FINAL SUMMARY ─────────────────────────────────────────────────────────────
+end_time = dt.now()
+total_duration = end_time - start_time
+total_seconds = int(total_duration.total_seconds())
+hours = total_seconds // 3600
+minutes = (total_seconds % 3600) // 60
+seconds = total_seconds % 60
+
+logger.info(f"")
+logger.info(f"╔══════════════════════════════════════════════════════════════════════╗")
+logger.info(f"║                         EXECUTION SUMMARY                            ║")
+logger.info(f"╠══════════════════════════════════════════════════════════════════════╣")
+logger.info(f"║  INDEX ID      : {str(index_id):<52}║")
+logger.info(f"║  INDEX NAME    : {output_index_name_fetcher.get('index_long_name'):<52}║")
+logger.info(f"║  DATA SOURCE   : NSE INDIA                                           ║")
+logger.info(f"║  TARGET TABLE  : india_vix_metadata                                  ║")
+logger.info(f"╠══════════════════════════════════════════════════════════════════════╣")
+logger.info(f"║  COMPLETED AT  : {dt.now().strftime('%d-%b-%Y %I:%M:%S %p'):<52}║")
+logger.info(f"║  TIME TAKEN    : {f'{hours}h {minutes}m {seconds}s':<52}║")
+logger.info(f"╠══════════════════════════════════════════════════════════════════════╣")
+logger.info(f"║  TOTAL BATCHES : {str(batch_number):<52}║")
+logger.info(f"║  ✓  INJECTED   : {str(success_count):<52}║")
+logger.info(f"║  ⚠  SKIPPED    : {str(skipped_count):<52}║")
+logger.info(f"║  ✗  FAILED     : {str(failed_count):<52}║")
+logger.info(f"╠══════════════════════════════════════════════════════════════════════╣")
+if failed_count == 0 and skipped_count == 0:
+  logger.info(f"║  RESULT        : ✓  ALL BATCHES COMPLETED SUCCESSFULLY               ║")
+elif failed_count > 0:
+  logger.info(f"║  RESULT        : ✗  PROCESS ENCOUNTERED FAILURES — REVIEW LOGS       ║")
+else:
+  logger.info(f"║  RESULT        : ⚠  COMPLETED WITH SKIPPED WINDOWS                   ║")
+logger.info(f"╚══════════════════════════════════════════════════════════════════════╝")
+logger.info(f"")
 
   
