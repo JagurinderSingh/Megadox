@@ -257,6 +257,10 @@ skipped_count = 0
 failed_count = 0
 iteration_number = 0
 start_time = dt.now()
+failed_months = []          # stores month-year string for failed iterations
+skipped_months = []         # stores month-year string for skipped iterations
+total_api_records = 0       # total records returned by API across all iterations
+total_injected_records = 0  # total records actually inserted into DB after cleaning
 
 with output_database_engine_connection.connect() as conn:
 
@@ -291,41 +295,22 @@ with output_database_engine_connection.connect() as conn:
       if data_received is None or len(data_received) == 0:
 
         skipped_count += 1
-        logger.info(f"  STATUS        : ⚠  DATA IS EMPTY / NONE — MONTH SKIPPED")
-        logger.info(f"  RESPONSE CODE : 200 (No Records for this Month)")
+        skipped_months.append(iteration_item)
+        logger.info(f"  STATUS        : ⚠  SKIPPED — No records for this month (Response 200, empty data)")
         logger.info(f"")
 
       else:
 
-        logger.info(f"  STATUS        : ✓  DATA RECEIVED — RESPONSE 200")
-        logger.info(f"  RECORDS FOUND : {len(data_received)}")
-        logger.info(f"")
-
-        # ── INPUT BLOCK ──────────────────────────────────────────────────────
-        logger.info(f"  ┌─ RAW INPUT FROM NSE INDIA {'─'*43}┐")
-        for i, record in enumerate(data_received):
-          logger.info(f"  │  Record [{i+1}]")
-          for key, value in record.items():
-            logger.info(f"  │    {key:<35} : {value}")
-        logger.info(f"  └{'─'*71}┘")
-        logger.info(f"")
-
         # ── INJECTION ────────────────────────────────────────────────────────
         output_injection = data_inject_nse_main_database(data_received)
 
-        # ── OUTPUT BLOCK ─────────────────────────────────────────────────────
-        logger.info(f"  ┌─ CLEANED OUTPUT (INJECTED TO DB) {'─'*36}┐")
-        for i, record in enumerate(output_injection):
-          logger.info(f"  │  Record [{i+1}]")
-          for key, value in record.items():
-            logger.info(f"  │    {key:<35} : {value}")
-        logger.info(f"  └{'─'*71}┘")
-        logger.info(f"")
-
         success_count += 1
+        total_api_records += len(data_received)
+        total_injected_records += len(output_injection)
         last_updated = datetime.now(ZoneInfo("Asia/Kolkata"))
-        logger.info(f"  INJECTION     : ✓  COMMITTED TO advance_decline_metadata")
-        logger.info(f"  LAST UPDATED  : {last_updated.strftime('%d-%b-%Y %I:%M:%S %p')}")
+        logger.info(f"  STATUS        : ✓  INJECTED TO DB — Cleaned & committed to advance_decline_metadata")
+        logger.info(f"  RECORDS       : {len(data_received)} record(s) returned by API")
+        logger.info(f"")
 
       #Randomized Break
       next_request_wait = random.uniform(1, 10)
@@ -335,6 +320,7 @@ with output_database_engine_connection.connect() as conn:
 
     elif output_nse_main_data_fetch.get("response_code") != 200:
       failed_count += 1
+      failed_months.append(iteration_item)
       logger.info(f"  STATUS        : ✗  FETCH FAILED")
       logger.info(f"  ERROR CODE    : {output_nse_main_data_fetch.get('response_code')}")
       logger.info(f"  ACTION        : PROCESS ABORTED")
@@ -365,6 +351,9 @@ logger.info(f"║  ✓  INJECTED   : {str(success_count):<52}║")
 logger.info(f"║  ⚠  SKIPPED    : {str(skipped_count):<52}║")
 logger.info(f"║  ✗  FAILED     : {str(failed_count):<52}║")
 logger.info(f"╠══════════════════════════════════════════════════════════════════════╣")
+logger.info(f"║  API RECORDS   : {str(total_api_records):<52}║")
+logger.info(f"║  DB INSERTED   : {str(total_injected_records):<52}║")
+logger.info(f"╠══════════════════════════════════════════════════════════════════════╣")
 if failed_count == 0 and skipped_count == 0:
   logger.info(f"║  RESULT        : ✓  ALL MONTHS COMPLETED SUCCESSFULLY                ║")
 elif failed_count > 0:
@@ -372,4 +361,19 @@ elif failed_count > 0:
 else:
   logger.info(f"║  RESULT        : ⚠  COMPLETED WITH SKIPPED MONTHS                    ║")
 logger.info(f"╚══════════════════════════════════════════════════════════════════════╝")
+
+if failed_months:
+  logger.info(f"")
+  logger.info(f"  ┌─ FAILED MONTHS {'─'*55}┐")
+  for i, m in enumerate(failed_months, 1):
+    logger.info(f"  │  [{i}]  {m:<63}│")
+  logger.info(f"  └{'─'*71}┘")
+
+if skipped_months:
+  logger.info(f"")
+  logger.info(f"  ┌─ SKIPPED MONTHS {'─'*54}┐")
+  for i, m in enumerate(skipped_months, 1):
+    logger.info(f"  │  [{i}]  {m:<63}│")
+  logger.info(f"  └{'─'*71}┘")
+
 logger.info(f"")

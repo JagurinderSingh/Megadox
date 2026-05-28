@@ -192,7 +192,7 @@ def nse_main_data_fetch(acceptable_start_date, acceptable_rolling_date):
 
     return {"response_code":response.status_code, "data":data}
 
-def data_inject_nse_main_database(data_nse_value):
+def data_inject_nse_main_database(data_nse_value, index_id):
 
   for bracket in range (0, len(data_nse_value)):
     for key, value in data_nse_value[bracket].items():
@@ -220,7 +220,7 @@ def data_inject_nse_main_database(data_nse_value):
   for bracket_nse in range (0, len(data_nse_value)):
 
     date_program = data_nse_value[bracket_nse].get("EOD_TIMESTAMP")
-
+   
     if date_program is None:
       continue
 
@@ -228,6 +228,34 @@ def data_inject_nse_main_database(data_nse_value):
     date_program_formatted = date_program_datetime.strftime("%Y-%m-%d")
     date_program_formatted_datetime = datetime.strptime(date_program_formatted, "%Y-%m-%d")
     date_program_formatted_datetime_onlydate = date_program_formatted_datetime.date()
+
+    current_record_count = 0
+    current_record_parameters = ["EOD_OPEN_INDEX_VAL", "EOD_HIGH_INDEX_VAL", "EOD_CLOSE_INDEX_VAL", "EOD_LOW_INDEX_VAL", "HIT_TURN_OVER", "HIT_TRADED_QTY", "EOD_TIMESTAMP"]
+
+    for item in data_nse_value[bracket_nse]:
+      if data_nse_value[bracket_nse].get(item) != None and item in current_record_parameters:
+          current_record_count += 1
+      else:
+        continue
+
+    query = text("SELECT * FROM price_metadata WHERE index_id = :index_id AND trade_date = :date_program_formatted_datetime_onlydate;")
+    execute_query = conn.execute(query, {"index_id":index_id, "date_program_formatted_datetime_onlydate": date_program_formatted_datetime_onlydate})
+    readable_data = execute_query.mappings().fetchall()
+
+    #Counting already present parameters data count
+
+    previous_record_count = 0
+    previous_record_parameters = ["trade_date", "open_price", "high_price", "low_price", "close_price", "shares_traded", "turnover_inr_cr"]
+
+    for single_list_item in readable_data: #The readable data is actually just a list containing a single dictionary with all the respective row items taken from the required table
+      for item in single_list_item:
+        if single_list_item.get(item) != None:
+          if item in previous_record_parameters:
+            previous_record_count += 1
+          else:
+            continue
+        else:
+          continue
 
     open_index_value = data_nse_value[bracket_nse].get("EOD_OPEN_INDEX_VAL")
     high_index_value = data_nse_value[bracket_nse].get("EOD_HIGH_INDEX_VAL")
@@ -238,14 +266,27 @@ def data_inject_nse_main_database(data_nse_value):
 
     if open_index_value is None and high_index_value is None and low_index_value is None and close_index_value is None and shares_traded_number is None and turnover_inr_cr_value is None:
       continue
+
+    if previous_record_count > current_record_count:
+      continue
+
+    elif previous_record_count < current_record_count or previous_record_count == current_record_count:
+
+      if previous_record_count == 0:
       
-    query = text("INSERT INTO price_metadata (index_id, trade_date, open_price, high_price, low_price, close_price, last_updated_time, shares_traded, turnover_inr_cr) VALUES (:index_id, :trade_date, :open_price, :high_price, :low_price, :close_price, :last_updated_time, :shares_traded, :turnover_inr_cr)")
-    conn.execute(query, {"index_id":index_id, "trade_date":date_program_formatted_datetime_onlydate, "open_price":open_index_value, "high_price":high_index_value, "low_price":low_index_value, "close_price":close_index_value, "last_updated_time":datetime.now(ZoneInfo("Asia/Kolkata")).replace(tzinfo=None), "shares_traded":shares_traded_number, "turnover_inr_cr":turnover_inr_cr_value})
-    conn.commit()
+        query = text("INSERT INTO price_metadata (index_id, trade_date, open_price, high_price, low_price, close_price, last_updated_time, shares_traded, turnover_inr_cr) VALUES (:index_id, :trade_date, :open_price, :high_price, :low_price, :close_price, :last_updated_time, :shares_traded, :turnover_inr_cr)")
+        conn.execute(query, {"index_id":index_id, "trade_date":date_program_formatted_datetime_onlydate, "open_price":open_index_value, "high_price":high_index_value, "low_price":low_index_value, "close_price":close_index_value, "last_updated_time":datetime.now(ZoneInfo("Asia/Kolkata")).replace(tzinfo=None), "shares_traded":shares_traded_number, "turnover_inr_cr":turnover_inr_cr_value})
+        conn.commit()
+ 
+      elif previous_record_count > 0:
+
+        query = text("UPDATE price_metadata SET open_price = :open_price, high_price = :high_price, low_price = :low_price, close_price = :close_price, last_updated_time = :last_updated_time, shares_traded = :shares_traded, turnover_inr_cr = :turnover_inr_cr WHERE index_id = :index_id AND trade_date = :trade_date")
+        conn.execute(query, {"index_id":index_id, "trade_date":date_program_formatted_datetime_onlydate, "open_price":open_index_value, "high_price":high_index_value, "low_price":low_index_value, "close_price":close_index_value, "last_updated_time":datetime.now(ZoneInfo("Asia/Kolkata")).replace(tzinfo=None), "shares_traded":shares_traded_number, "turnover_inr_cr":turnover_inr_cr_value})
+        conn.commit()
 
   return data_nse_value
 
-def data_inject_nifty_indices_database(data_nifty_indices_value):
+def data_inject_nifty_indices_database(data_nifty_indices_value, index_id):
 
   for bracket in range (0, len(data_nifty_indices_value)):
     for key, value in data_nifty_indices_value[bracket].items():
@@ -281,6 +322,34 @@ def data_inject_nifty_indices_database(data_nifty_indices_value):
     trade_date_data_formatted = trade_date_niftyindices_datetime_datatype.strftime("%Y-%m-%d")
     final_trade_date = datetime.strptime(trade_date_data_formatted, "%Y-%m-%d")
 
+    current_record_count = 0
+    current_record_parameters = ["HistoricalDate", "OPEN", "HIGH", "LOW", "CLOSE"]
+
+    for item in data_nifty_indices_value[bracket_nse]:
+      if data_nifty_indices_value[bracket_nse].get(item) != None and item in current_record_parameters:
+          current_record_count += 1
+      else:
+        continue
+
+    query = text("SELECT * FROM price_metadata WHERE index_id = :index_id AND trade_date = :final_trade_date;")
+    execute_query = conn.execute(query, {"index_id":index_id, "date_program_formatted_datetime_onlydate": final_trade_date})
+    readable_data = execute_query.mappings().fetchall()
+
+    #Counting already present parameters data count
+
+    previous_record_count = 0
+    previous_record_parameters = ["trade_date", "open_price", "high_price", "low_price", "close_price", "shares_traded", "turnover_inr_cr"]
+
+    for single_list_item in readable_data: #The readable data is actually just a list containing a single dictionary with all the respective row items taken from the required table
+      for item in single_list_item:
+        if single_list_item.get(item) != None:
+          if item in previous_record_parameters:
+            previous_record_count += 1
+          else:
+            continue
+        else:
+          continue
+
     open_price_niftyindices = data_nifty_indices_value[bracket_nse].get("OPEN")
     high_price_niftyindices = data_nifty_indices_value[bracket_nse].get("HIGH")
     low_price_niftyindices = data_nifty_indices_value[bracket_nse].get("LOW")
@@ -288,10 +357,23 @@ def data_inject_nifty_indices_database(data_nifty_indices_value):
 
     if open_price_niftyindices is None and high_price_niftyindices is None and low_price_niftyindices is None and close_price_niftyindices is None:
       continue
+
+    if previous_record_count > current_record_count:
+      continue
+
+    elif previous_record_count < current_record_count or previous_record_count == current_record_count:
+
+      if previous_record_count == 0:
       
-    query = text("INSERT INTO price_metadata (index_id, trade_date, open_price, high_price, low_price, close_price, last_updated_time, shares_traded, turnover_inr_cr) VALUES (:index_id, :trade_date, :open_price, :high_price, :low_price, :close_price, :last_updated_time, :shares_traded, :turnover_inr_cr)")
-    conn.execute(query, {"index_id":index_id, "trade_date":final_trade_date, "open_price":open_price_niftyindices, "high_price":high_price_niftyindices, "low_price":low_price_niftyindices, "close_price":close_price_niftyindices, "last_updated_time":datetime.now(ZoneInfo("Asia/Kolkata")).replace(tzinfo=None), "shares_traded":None, "turnover_inr_cr":None})
-    conn.commit()
+        query = text("INSERT INTO price_metadata (index_id, trade_date, open_price, high_price, low_price, close_price, last_updated_time, shares_traded, turnover_inr_cr) VALUES (:index_id, :trade_date, :open_price, :high_price, :low_price, :close_price, :last_updated_time, :shares_traded, :turnover_inr_cr)")
+        conn.execute(query, {"index_id":index_id, "trade_date":final_trade_date, "open_price":open_price_niftyindices, "high_price":high_price_niftyindices, "low_price":low_price_niftyindices, "close_price":close_price_niftyindices, "last_updated_time":datetime.now(ZoneInfo("Asia/Kolkata")).replace(tzinfo=None), "shares_traded":None, "turnover_inr_cr":None})
+        conn.commit()
+
+      elif previous_record_count > 0:
+
+        query = text("UPDATE price_metadata SET open_price = :open_price, high_price = :high_price, low_price = :low_price, close_price = :close_price, last_updated_time = :last_updated_time, shares_traded = :shares_traded, turnover_inr_cr = :turnover_inr_cr WHERE index_id = :index_id AND trade_date = :trade_date")
+        conn.execute(query, {"index_id":index_id, "trade_date":final_trade_date, "open_price":open_price_niftyindices, "high_price":high_price_niftyindices, "low_price":low_price_niftyindices, "close_price":close_price_niftyindices, "last_updated_time":datetime.now(ZoneInfo("Asia/Kolkata")).replace(tzinfo=None), "shares_traded":None, "turnover_inr_cr":None})
+        conn.commit()
 
   return data_nifty_indices_value
 
@@ -349,7 +431,12 @@ if proceed == 1:
   skipped_count = 0
   failed_count = 0
   batch_number = 0
+  latest_record_injection_date = 0
   start_time = dt.now()
+  failed_batches = []   # stores (start, end) date strings for failed batches
+  skipped_batches = []  # stores (start, end) date strings for skipped batches
+  total_api_records = 0       # total records returned by API across all batches
+  total_injected_records = 0  # total records actually inserted into DB after cleaning
 
   with output_database_engine_connection.connect() as conn:
 
@@ -390,41 +477,22 @@ if proceed == 1:
           if data_received is None or len(data_received) == 0:
 
             skipped_count += 1
-            logger.info(f"  STATUS        : ⚠  DATA IS EMPTY / NONE — BATCH SKIPPED")
-            logger.info(f"  RESPONSE CODE : 200 (No Records in Window)")
+            skipped_batches.append((acceptable_start_date, acceptable_rolling_date))
+            logger.info(f"  STATUS        : ⚠  SKIPPED — No records in window (Response 200, empty data)")
             logger.info(f"")
 
           else:
 
-            logger.info(f"  STATUS        : ✓  DATA RECEIVED — RESPONSE 200")
-            logger.info(f"  RECORDS FOUND : {len(data_received)}")
-            logger.info(f"")
-
-            # ── INPUT BLOCK ──────────────────────────────────────────────
-            logger.info(f"  ┌─ RAW INPUT FROM NSE INDIA {'─'*43}┐")
-            for i, record in enumerate(data_received):
-              logger.info(f"  │  Record [{i+1}]")
-              for key, value in record.items():
-                logger.info(f"  │    {key:<35} : {value}")
-            logger.info(f"  └{'─'*71}┘")
-            logger.info(f"")
-
             # ── INJECTION ────────────────────────────────────────────────
             output_injection = data_inject_nse_main_database(data_received)
 
-            # ── OUTPUT BLOCK ─────────────────────────────────────────────
-            logger.info(f"  ┌─ CLEANED OUTPUT (INJECTED TO DB) {'─'*36}┐")
-            for i, record in enumerate(output_injection):
-              logger.info(f"  │  Record [{i+1}]")
-              for key, value in record.items():
-                logger.info(f"  │    {key:<35} : {value}")
-            logger.info(f"  └{'─'*71}┘")
-            logger.info(f"")
-
             success_count += 1
+            total_api_records += len(data_received)
+            total_injected_records += len(output_injection)
             last_updated = datetime.now(ZoneInfo("Asia/Kolkata"))
-            logger.info(f"  INJECTION     : ✓  COMMITTED TO price_metadata")
-            logger.info(f"  LAST UPDATED  : {last_updated.strftime('%d-%b-%Y %I:%M:%S %p')}")
+            logger.info(f"  STATUS        : ✓  INJECTED TO DB — Cleaned & committed to price_metadata")
+            logger.info(f"  RECORDS       : {len(data_received)} record(s) returned by API")
+            logger.info(f"")
 
           # Resetting the Dates
           start_date = rolling_date + timedelta(days=1)
@@ -439,6 +507,7 @@ if proceed == 1:
 
         elif output_nse_main_data_fetch.get("response_code") != 200:
           failed_count += 1
+          failed_batches.append((acceptable_start_date, acceptable_rolling_date))
           logger.info(f"  STATUS        : ✗  FETCH FAILED")
           logger.info(f"  ERROR CODE    : {output_nse_main_data_fetch.get('response_code')}")
           logger.info(f"  ACTION        : PROCESS ABORTED")
@@ -488,41 +557,22 @@ if proceed == 1:
           if data_received is None or len(data_received) == 0:
 
             skipped_count += 1
-            logger.info(f"  STATUS        : ⚠  DATA IS EMPTY / NONE — BATCH SKIPPED")
-            logger.info(f"  RESPONSE CODE : 200 (No Records in Window)")
+            skipped_batches.append((acceptable_start_date, acceptable_rolling_date))
+            logger.info(f"  STATUS        : ⚠  SKIPPED — No records in window (Response 200, empty data)")
             logger.info(f"")
 
           else:
 
-            logger.info(f"  STATUS        : ✓  DATA RECEIVED — RESPONSE 200")
-            logger.info(f"  RECORDS FOUND : {len(data_received)}")
-            logger.info(f"")
-
-            # ── INPUT BLOCK ──────────────────────────────────────────────
-            logger.info(f"  ┌─ RAW INPUT FROM NIFTY INDICES {'─'*39}┐")
-            for i, record in enumerate(data_received):
-              logger.info(f"  │  Record [{i+1}]")
-              for key, value in record.items():
-                logger.info(f"  │    {key:<35} : {value}")
-            logger.info(f"  └{'─'*71}┘")
-            logger.info(f"")
-
             # ── INJECTION ────────────────────────────────────────────────
             output_injection = data_inject_nifty_indices_database(data_received)
 
-            # ── OUTPUT BLOCK ─────────────────────────────────────────────
-            logger.info(f"  ┌─ CLEANED OUTPUT (INJECTED TO DB) {'─'*36}┐")
-            for i, record in enumerate(output_injection):
-              logger.info(f"  │  Record [{i+1}]")
-              for key, value in record.items():
-                logger.info(f"  │    {key:<35} : {value}")
-            logger.info(f"  └{'─'*71}┘")
-            logger.info(f"")
-
             success_count += 1
+            total_api_records += len(data_received)
+            total_injected_records += len(output_injection)
             last_updated = datetime.now(ZoneInfo("Asia/Kolkata"))
-            logger.info(f"  INJECTION     : ✓  COMMITTED TO price_metadata")
-            logger.info(f"  LAST UPDATED  : {last_updated.strftime('%d-%b-%Y %I:%M:%S %p')}")
+            logger.info(f"  STATUS        : ✓  INJECTED TO DB — Cleaned & committed to price_metadata")
+            logger.info(f"  RECORDS       : {len(data_received)} record(s) returned by API")
+            logger.info(f"")
 
           # Resetting the Dates
           start_date = rolling_date + timedelta(days=1)
@@ -537,6 +587,7 @@ if proceed == 1:
       
         elif output_nifty_indices_data_fetch.get("response_code") != 200:
           failed_count += 1
+          failed_batches.append((acceptable_start_date, acceptable_rolling_date))
           logger.info(f"  STATUS        : ✗  FETCH FAILED")
           logger.info(f"  ERROR CODE    : {output_nifty_indices_data_fetch.get('response_code')}")
           logger.info(f"  ACTION        : PROCESS ABORTED")
@@ -575,6 +626,9 @@ if proceed == 1:
   logger.info(f"║  ⚠  SKIPPED    : {str(skipped_count):<52}║")
   logger.info(f"║  ✗  FAILED     : {str(failed_count):<52}║")
   logger.info(f"╠══════════════════════════════════════════════════════════════════════╣")
+  logger.info(f"║  API RECORDS   : {str(total_api_records):<52}║")
+  logger.info(f"║  DB INSERTED   : {str(total_injected_records):<52}║")
+  logger.info(f"╠══════════════════════════════════════════════════════════════════════╣")
   if failed_count == 0 and skipped_count == 0:
     logger.info(f"║  RESULT        : ✓  ALL BATCHES COMPLETED SUCCESSFULLY               ║")
   elif failed_count > 0:
@@ -582,6 +636,21 @@ if proceed == 1:
   else:
     logger.info(f"║  RESULT        : ⚠  COMPLETED WITH SKIPPED WINDOWS                   ║")
   logger.info(f"╚══════════════════════════════════════════════════════════════════════╝")
+
+  if failed_batches:
+    logger.info(f"")
+    logger.info(f"  ┌─ FAILED BATCH DATE RANGES {'─'*44}┐")
+    for i, (s, e) in enumerate(failed_batches, 1):
+      logger.info(f"  │  [{i}]  {s}  →  {e:<47}│")
+    logger.info(f"  └{'─'*71}┘")
+
+  if skipped_batches:
+    logger.info(f"")
+    logger.info(f"  ┌─ SKIPPED BATCH DATE RANGES {'─'*43}┐")
+    for i, (s, e) in enumerate(skipped_batches, 1):
+      logger.info(f"  │  [{i}]  {s}  →  {e:<47}│")
+    logger.info(f"  └{'─'*71}┘")
+
   logger.info(f"")
 
 elif proceed == 0:
