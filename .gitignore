@@ -4,4 +4,6 @@
 venv
 tempCodeRunnerFile.py
 holidays_robustness.py
+__pycache__/
+
 
