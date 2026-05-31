@@ -93,11 +93,11 @@ latest_injection_summary = {}
 
 logger.info(f"")
 logger.info(f"╔══════════════════════════════════════════════════════════════════════╗")
-logger.info(f"║        NIFTY INDEX HISTORICAL DATA INGESTION — EXECUTION LOG         ║")
+logger.info(f"║   NIFTY INDEX HISTORICAL VALUATION DATA INGESTION — EXECUTION LOG         ║")
 logger.info(f"╠══════════════════════════════════════════════════════════════════════╣")
 logger.info(f"║  RUN TIMESTAMP : {dt.now().strftime('%d-%b-%Y %I:%M:%S %p'):<52}║")
-logger.info(f"║  SCRIPT        : data_ingestion_price.py                             ║")
-logger.info(f"║  PURPOSE       : Bulk Historical Price Ingestion (Rolling 30-Day)    ║")
+logger.info(f"║  SCRIPT        : valuation_data_ingestion.py                             ║")
+logger.info(f"║  PURPOSE       : Bulk Historical Valuation Data Ingestion (Rolling 30-Day)    ║")
 logger.info(f"╚══════════════════════════════════════════════════════════════════════╝")
 logger.info(f"")
 
@@ -213,7 +213,7 @@ def environment_setup_nse_main():
 
 def environment_setup_nifty_indices():
 
-    url = "https://www.niftyindices.com/Backpage.aspx/getHistoricaldatatabletoString"
+    url = "https://www.niftyindices.com/Backpage.aspx/getpepbHistoricaldataDBtoString"
     session = requests.Session() 
     selected_identity = user_agent_and_impersonates_selection()
 
@@ -233,11 +233,11 @@ def environment_setup_nifty_indices():
 
     # Visiting home to get the required cookies
     bootstrap_response = session.get("https://www.niftyindices.com/", headers=headers, impersonate=selected_identity.get("impersonate_choice"), timeout=10)
-    log_kv("NI cookie prime", f"HTTP {bootstrap_response.status_code}")
+    log_kv("Nifty Indices cookie prime", f"HTTP {bootstrap_response.status_code}")
 
     # Small pause to ensure cookies are registered
     cookies_sleeping_time = random.uniform(2, 5)
-    log_kv("NI cookie wait", f"{cookies_sleeping_time:.4f} seconds")
+    log_kv("Nifty Indices cookie wait", f"{cookies_sleeping_time:.4f} seconds")
     time.sleep(cookies_sleeping_time)
 
     return {"session":session, "headers":headers, "url":url}
@@ -272,7 +272,7 @@ def nse_main_data_fetch(acceptable_start_date, acceptable_rolling_date):
     # The Actual Data Fetch
     encoded_index_long_name = urllib.parse.quote(output_index_name_fetcher.get("index_long_name"))
 
-    url = f"https://www.nseindia.com/api/historicalOR/indicesHistory?indexType={encoded_index_long_name}&from={acceptable_start_date}&to={acceptable_rolling_date}"
+    url = f"https://www.nseindia.com/api/historicalOR/indicesYield?indexType={encoded_index_long_name}&from={acceptable_start_date}&to={acceptable_rolling_date}"
     request_start = dt.now()
     log_kv("Fetch source", "NSE INDIA")
     log_kv("Fetch endpoint", url)
@@ -330,11 +330,11 @@ def data_inject_nse_main_database(data_nse_value, index_id):
 
   for bracket_nse in range (0, len(data_nse_value)):
 
-    date_program = data_nse_value[bracket_nse].get("EOD_TIMESTAMP")
+    date_program = data_nse_value[bracket_nse].get("IY_DT")
    
     if date_program is None:
       skipped_missing_date += 1
-      log_kv("Skipped record", f"NSE row #{bracket_nse + 1}: missing EOD_TIMESTAMP")
+      log_kv("Skipped record", f"NSE row #{bracket_nse + 1}: missing IY_DT")
       continue
 
     date_program_datetime = datetime.strptime(date_program, "%d-%b-%Y")
@@ -343,7 +343,7 @@ def data_inject_nse_main_database(data_nse_value, index_id):
     date_program_formatted_datetime_onlydate = date_program_formatted_datetime.date()
 
     current_record_count = 0
-    current_record_parameters = ["EOD_OPEN_INDEX_VAL", "EOD_HIGH_INDEX_VAL", "EOD_CLOSE_INDEX_VAL", "EOD_LOW_INDEX_VAL", "HIT_TURN_OVER", "HIT_TRADED_QTY", "EOD_TIMESTAMP"]
+    current_record_parameters = ["IY_DY", "IY_PE", "IY_PB", "IY_DT"]
 
     for item in data_nse_value[bracket_nse]:
       if data_nse_value[bracket_nse].get(item) != None and item in current_record_parameters:
@@ -351,14 +351,14 @@ def data_inject_nse_main_database(data_nse_value, index_id):
       else:
         continue
 
-    query = text("SELECT * FROM price_metadata WHERE index_id = :index_id AND trade_date = :date_program_formatted_datetime_onlydate;")
+    query = text("SELECT * FROM valuation_metadata WHERE index_id = :index_id AND trade_date = :date_program_formatted_datetime_onlydate;")
     execute_query = conn.execute(query, {"index_id":index_id, "date_program_formatted_datetime_onlydate": date_program_formatted_datetime_onlydate})
     readable_data = execute_query.mappings().fetchall()
 
     #Counting already present parameters data count
 
     previous_record_count = 0
-    previous_record_parameters = ["trade_date", "open_price", "high_price", "low_price", "close_price", "shares_traded", "turnover_inr_cr"]
+    previous_record_parameters = ["trade_date", "div_yield", "pb_ratio", "pe_ratio"]
 
     for single_list_item in readable_data: #The readable data is actually just a list containing a single dictionary with all the respective row items taken from the required table
       for item in single_list_item:
@@ -370,16 +370,13 @@ def data_inject_nse_main_database(data_nse_value, index_id):
         else:
           continue
 
-    open_index_value = data_nse_value[bracket_nse].get("EOD_OPEN_INDEX_VAL")
-    high_index_value = data_nse_value[bracket_nse].get("EOD_HIGH_INDEX_VAL")
-    low_index_value = data_nse_value[bracket_nse].get("EOD_LOW_INDEX_VAL")
-    close_index_value = data_nse_value[bracket_nse].get("EOD_CLOSE_INDEX_VAL")
-    shares_traded_number = data_nse_value[bracket_nse].get("HIT_TRADED_QTY")
-    turnover_inr_cr_value = data_nse_value[bracket_nse].get("HIT_TURN_OVER")
-
-    if open_index_value is None and high_index_value is None and low_index_value is None and close_index_value is None and shares_traded_number is None and turnover_inr_cr_value is None:
+    pe_ratio_value = data_nse_value[bracket_nse].get("IY_PE")
+    pb_ratio_value = data_nse_value[bracket_nse].get("IY_PB")
+    div_yield_value = data_nse_value[bracket_nse].get("IY_DY")
+    
+    if pe_ratio_value is None and pb_ratio_value is None and div_yield_value:
       skipped_empty_price += 1
-      log_kv("Skipped record", f"{date_program_formatted}: no OHLC / volume / turnover values")
+      log_kv("Skipped record", f"{date_program_formatted}: no pe_ratio / pb_ratio / div_yield")
       continue
 
     if previous_record_count > current_record_count:
@@ -391,18 +388,18 @@ def data_inject_nse_main_database(data_nse_value, index_id):
 
       if previous_record_count == 0:
       
-        query = text("INSERT INTO price_metadata (index_id, trade_date, open_price, high_price, low_price, close_price, last_updated_time, shares_traded, turnover_inr_cr) VALUES (:index_id, :trade_date, :open_price, :high_price, :low_price, :close_price, :last_updated_time, :shares_traded, :turnover_inr_cr)")
-        conn.execute(query, {"index_id":index_id, "trade_date":date_program_formatted_datetime_onlydate, "open_price":open_index_value, "high_price":high_index_value, "low_price":low_index_value, "close_price":close_index_value, "last_updated_time":datetime.now(ZoneInfo("Asia/Kolkata")).replace(tzinfo=None), "shares_traded":shares_traded_number, "turnover_inr_cr":turnover_inr_cr_value})
+        query = text("INSERT INTO valuation_metadata (index_id, trade_date, pe_ratio, pb_ratio, div_yield, last_updated_time) VALUES (:index_id, :trade_date, :pe_ratio, :pb_ratio, :div_yield, :last_updated_time)")
+        conn.execute(query, {"index_id":index_id, "trade_date":date_program_formatted_datetime_onlydate, "pe_ratio":pe_ratio_value, "pb_ratio":pb_ratio_value, "div_yield":div_yield_value, "last_updated_time":datetime.now(ZoneInfo("Asia/Kolkata")).replace(tzinfo=None)})
         conn.commit()
 
         ingestion_date_set.add(date_program_formatted_datetime_onlydate)
         inserted_records += 1
-        log_kv("Inserted", f"{date_program_formatted} | O={open_index_value}, H={high_index_value}, L={low_index_value}, C={close_index_value}, shares={shares_traded_number}, turnover={turnover_inr_cr_value}")
+        log_kv("Inserted", f"{date_program_formatted} | PE={pe_ratio_value}, PB={pb_ratio_value}, D={div_yield_value}")
  
       elif previous_record_count > 0:
 
-        query = text("UPDATE price_metadata SET open_price = :open_price, high_price = :high_price, low_price = :low_price, close_price = :close_price, last_updated_time = :last_updated_time, shares_traded = :shares_traded, turnover_inr_cr = :turnover_inr_cr WHERE index_id = :index_id AND trade_date = :trade_date")
-        conn.execute(query, {"index_id":index_id, "trade_date":date_program_formatted_datetime_onlydate, "open_price":open_index_value, "high_price":high_index_value, "low_price":low_index_value, "close_price":close_index_value, "last_updated_time":datetime.now(ZoneInfo("Asia/Kolkata")).replace(tzinfo=None), "shares_traded":shares_traded_number, "turnover_inr_cr":turnover_inr_cr_value})
+        query = text("UPDATE valuation_metadata SET pe_ratio = :pe_ratio, pb_ratio = :pb_ratio, div_yield = :div_yield, last_updated_time = :last_updated_time WHERE index_id = :index_id AND trade_date = :trade_date")
+        conn.execute(query, {"index_id":index_id, "trade_date":date_program_formatted_datetime_onlydate, "pe_ratio":pe_ratio_value, "pb_ratio":pb_ratio_value, "div_yield":div_yield_value, "last_updated_time":datetime.now(ZoneInfo("Asia/Kolkata")).replace(tzinfo=None)})
         conn.commit()
 
         ingestion_date_set.add(date_program_formatted_datetime_onlydate)
@@ -474,11 +471,11 @@ def data_inject_nifty_indices_database(data_nifty_indices_value, index_id):
 
   for bracket_nse in range (0, len(data_nifty_indices_value)):
 
-    trade_date_niftyindices = data_nifty_indices_value[bracket_nse].get("HistoricalDate")
+    trade_date_niftyindices = data_nifty_indices_value[bracket_nse].get("DATE")
 
     if trade_date_niftyindices is None:
       skipped_missing_date += 1
-      log_kv("Skipped record", f"Nifty Indices row #{bracket_nse + 1}: missing HistoricalDate")
+      log_kv("Skipped record", f"Nifty Indices row #{bracket_nse + 1}: missing DATE")
       continue
 
     trade_date_niftyindices_datetime_datatype = datetime.strptime(trade_date_niftyindices, "%d %b %Y")
@@ -486,7 +483,7 @@ def data_inject_nifty_indices_database(data_nifty_indices_value, index_id):
     final_trade_date = datetime.strptime(trade_date_data_formatted, "%Y-%m-%d")
 
     current_record_count = 0
-    current_record_parameters = ["HistoricalDate", "OPEN", "HIGH", "LOW", "CLOSE"]
+    current_record_parameters = ["pe", "pb", "divYield", "DATE"]
 
     for item in data_nifty_indices_value[bracket_nse]:
       if data_nifty_indices_value[bracket_nse].get(item) != None and item in current_record_parameters:
@@ -494,14 +491,14 @@ def data_inject_nifty_indices_database(data_nifty_indices_value, index_id):
       else:
         continue
 
-    query = text("SELECT * FROM price_metadata WHERE index_id = :index_id AND trade_date = :final_trade_date;")
+    query = text("SELECT * FROM valuation_metadata WHERE index_id = :index_id AND trade_date = :final_trade_date;")
     execute_query = conn.execute(query, {"index_id":index_id, "final_trade_date": final_trade_date})
     readable_data = execute_query.mappings().fetchall()
 
     #Counting already present parameters data count
 
     previous_record_count = 0
-    previous_record_parameters = ["trade_date", "open_price", "high_price", "low_price", "close_price", "shares_traded", "turnover_inr_cr"]
+    previous_record_parameters = ["trade_date", "div_yield", "pb_ratio", "pe_ratio"]
 
     for single_list_item in readable_data: #The readable data is actually just a list containing a single dictionary with all the respective row items taken from the required table
       for item in single_list_item:
@@ -513,14 +510,13 @@ def data_inject_nifty_indices_database(data_nifty_indices_value, index_id):
         else:
           continue
 
-    open_price_niftyindices = data_nifty_indices_value[bracket_nse].get("OPEN")
-    high_price_niftyindices = data_nifty_indices_value[bracket_nse].get("HIGH")
-    low_price_niftyindices = data_nifty_indices_value[bracket_nse].get("LOW")
-    close_price_niftyindices = data_nifty_indices_value[bracket_nse].get("CLOSE")
-
-    if open_price_niftyindices is None and high_price_niftyindices is None and low_price_niftyindices is None and close_price_niftyindices is None:
+    pe_ratio_value_niftyindices = data_nifty_indices_value[bracket_nse].get("pe")
+    pb_ratio_value_niftyindices = data_nifty_indices_value[bracket_nse].get("pb")
+    div_yield_value_niftyindices = data_nifty_indices_value[bracket_nse].get("divYield")
+    
+    if pe_ratio_value_niftyindices is None and pb_ratio_value_niftyindices is None and div_yield_value_niftyindices is None:
       skipped_empty_price += 1
-      log_kv("Skipped record", f"{trade_date_data_formatted}: no OHLC values")
+      log_kv("Skipped record", f"{trade_date_data_formatted}: no PE_RATIO, PB_RATIO, DIV_YIELD values")
       continue
 
     if previous_record_count > current_record_count:
@@ -532,18 +528,18 @@ def data_inject_nifty_indices_database(data_nifty_indices_value, index_id):
 
       if previous_record_count == 0:
       
-        query = text("INSERT INTO price_metadata (index_id, trade_date, open_price, high_price, low_price, close_price, last_updated_time, shares_traded, turnover_inr_cr) VALUES (:index_id, :trade_date, :open_price, :high_price, :low_price, :close_price, :last_updated_time, :shares_traded, :turnover_inr_cr)")
-        conn.execute(query, {"index_id":index_id, "trade_date":final_trade_date, "open_price":open_price_niftyindices, "high_price":high_price_niftyindices, "low_price":low_price_niftyindices, "close_price":close_price_niftyindices, "last_updated_time":datetime.now(ZoneInfo("Asia/Kolkata")).replace(tzinfo=None), "shares_traded":None, "turnover_inr_cr":None})
+        query = text("INSERT INTO valuation_metadata (index_id, trade_date, pe_ratio, pb_ratio, div_yield, last_updated_time) VALUES (:index_id, :trade_date, :pe_ratio, :pb_ratio, :div_yield, :last_updated_time)")
+        conn.execute(query, {"index_id":index_id, "trade_date":final_trade_date, "pe_ratio":pe_ratio_value_niftyindices, "pb_ratio":pb_ratio_value_niftyindices, "div_yield":div_yield_value_niftyindices, "last_updated_time":datetime.now(ZoneInfo("Asia/Kolkata")).replace(tzinfo=None)})
         conn.commit()
 
         ingestion_date_set.add(final_trade_date.date())
         inserted_records += 1
-        log_kv("Inserted", f"{trade_date_data_formatted} | O={open_price_niftyindices}, H={high_price_niftyindices}, L={low_price_niftyindices}, C={close_price_niftyindices}")
+        log_kv("Inserted", f"{trade_date_data_formatted} | PE={pe_ratio_value_niftyindices}, PB={pb_ratio_value_niftyindices}, DY={div_yield_value_niftyindices}")
 
       elif previous_record_count > 0:
 
-        query = text("UPDATE price_metadata SET open_price = :open_price, high_price = :high_price, low_price = :low_price, close_price = :close_price, last_updated_time = :last_updated_time, shares_traded = :shares_traded, turnover_inr_cr = :turnover_inr_cr WHERE index_id = :index_id AND trade_date = :trade_date")
-        conn.execute(query, {"index_id":index_id, "trade_date":final_trade_date, "open_price":open_price_niftyindices, "high_price":high_price_niftyindices, "low_price":low_price_niftyindices, "close_price":close_price_niftyindices, "last_updated_time":datetime.now(ZoneInfo("Asia/Kolkata")).replace(tzinfo=None), "shares_traded":None, "turnover_inr_cr":None})
+        query = text("UPDATE valuation_metadata SET pe_ratio = :pe_ratio, pb_ratio = :pb_ratio, div_yield = :div_yield, last_updated_time = :last_updated_time WHERE index_id = :index_id AND trade_date = :trade_date")
+        conn.execute(query, {"index_id":index_id, "trade_date":final_trade_date, "pe_ratio":pe_ratio_value_niftyindices, "pb_ratio":pb_ratio_value_niftyindices, "div_yield":div_yield_value_niftyindices, "last_updated_time":datetime.now(ZoneInfo("Asia/Kolkata")).replace(tzinfo=None)})
         conn.commit()
 
         ingestion_date_set.add(final_trade_date.date())
