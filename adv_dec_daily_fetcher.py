@@ -48,7 +48,7 @@ def today_date_fetch():
   today = date.today()
   return today
 
-today_date = today_date_fetch() #- timedelta(days=4)
+today_date = today_date_fetch() - timedelta(days=4)
 today_date = today_date.strftime("%d-%m-%Y")
 
 def user_agent_and_impersonates_selection():
