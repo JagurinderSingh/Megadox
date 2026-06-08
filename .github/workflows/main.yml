@@ -32,6 +32,7 @@ jobs:
       # 4. THE SPECIFIC MAIN CODE TO RUN YOUR FILE
       - name: Run NSE Daily Price Fetcher Script
         env:
+          PYTHONUNBUFFERED: "1"
           # This securely links your secret database password to your python script environment
           database_password_cockroach_db: ${{ secrets.DATABASE_PASSWORD_COCKROACH_DB }}
         run: |
@@ -40,6 +41,7 @@ jobs:
       # Step 4: Your original script
       - name: Run NSE Daily Valuation Fetcher Script
         env:
+          PYTHONUNBUFFERED: "1"
           database_password_cockroach_db: ${{ secrets.DATABASE_PASSWORD_COCKROACH_DB }}
         run: |
           python -u "valuation_daily_fetcher.py"
@@ -47,6 +49,7 @@ jobs:
       # Step 5: Your second script
       - name: Run India Vix Daily Data Fetcher Script
         env:
+          PYTHONUNBUFFERED: "1"
           database_password_cockroach_db: ${{ secrets.DATABASE_PASSWORD_COCKROACH_DB }}
         run: |
           python -u "india_vix_daily.py"
@@ -54,6 +57,7 @@ jobs:
       # Step 6: Your third script
       - name: Run Advance Decline Daily Data Fetcher Script
         env:
+          PYTHONUNBUFFERED: "1"
           database_password_cockroach_db: ${{ secrets.DATABASE_PASSWORD_COCKROACH_DB }}
         run: |
           python -u "adv_dec_daily_fetcher.py"
