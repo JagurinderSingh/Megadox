@@ -2,8 +2,9 @@ name: Daily Data Database Updater
 
 on:
   schedule:
-    # Runs exactly once a day at 17:30 UTC (23:00 Indian Standard Time)
+    #23:00 Indian Standard Time
     - cron: '00 23 * * *' #Minute, Hour, Day of the Month, Month, Day of Week
+      timezone: 'Asia/Kolkata'
     # * represents null
   
   # Keeps a manual "Run workflow" button in your GitHub dashboard just in case
