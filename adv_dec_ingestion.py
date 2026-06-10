@@ -53,9 +53,12 @@ logger.info(f"")
 def database_engine_connection():
 
   #Engine Connection Established
-  database_password = os.getenv("database_password")
-  DB_URL = f"postgresql://postgres:{database_password}@localhost:5432/index_value_strategy"
+  database_password = os.getenv("database_password_cockroach_db")
+  #log_kv("DB password env", "present" if database_password else "missing")
+  DB_URL = f"cockroachdb+psycopg://postgres:{database_password}@megadox-27437.j77.aws-ap-south-1.cockroachlabs.cloud:26257/index_value_strategy?sslmode=require"
+  #log_kv("DB target", "cockroachdb+psycopg://postgres:***@megadox-27437.j77.aws-ap-south-1.cockroachlabs.cloud:26257/index_value_strategy?sslmode=require")
   engine = create_engine(DB_URL)
+  #log_kv("Engine object", "created")
   return engine
 
 logger.info(f"  STEP 1        : Establishing database engine connection...")

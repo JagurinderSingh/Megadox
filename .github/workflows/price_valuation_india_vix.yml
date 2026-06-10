@@ -2,7 +2,7 @@ name: Daily Price, Valuation and India Vix Database Updater
 
 on:
   schedule:
-    #18:00 Indian Standard Time and UTC is +05:30 Hours of IST
+    #18:00 Indian Standard Time and IST is +05:30 Hours of UTC i.e. IST is exactly 5 Hours 30 Minutes ahead of UTC
     - cron: '30 12 * * *'  #Minute, Hour, Day of the Month, Month, Day of Week
     # * represents null
   

@@ -303,7 +303,7 @@ def data_inject_nse_main_database(data_nse_value, index_id):
     
     #Finally Pushing Whole Data into the Database
     query = text("INSERT INTO valuation_metadata (index_id, trade_date, pe_ratio, pb_ratio, div_yield, last_updated_time) VALUES (:index_id, :trade_date, :pe_ratio, :pb_ratio, :div_yield, :last_updated_time)")
-    conn.execute(query, {"index_id":index_id, "trade_date":date_program_formatted_datetime_onlydate, "pe_ratio":pe_value, "pb_ratio":pb_value, "div_yield":div_yield_value, "last_updated_time":datetime.now(ZoneInfo("Asia/Kolkata"))})
+    conn.execute(query, {"index_id":index_id, "trade_date":date_program_formatted_datetime_onlydate, "pe_ratio":pe_value, "pb_ratio":pb_value, "div_yield":div_yield_value, "last_updated_time":datetime.now(ZoneInfo("Asia/Kolkata"))}) #Still fetch IST regardless of where it is running in the world, perfect for Cron Jobs
     conn.commit()
 
   return data_nse_value
