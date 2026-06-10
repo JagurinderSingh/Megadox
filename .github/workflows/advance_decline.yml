@@ -1,0 +1,38 @@
+name: Daily Advance Decline Database Updater
+
+on:
+  schedule:
+    #18:00 Indian Standard Time and UTC is +05:30 Hours of IST
+    - cron: '30 12 * * *'  #Minute, Hour, Day of the Month, Month, Day of Week
+    # * represents null
+  
+  # Keeps a manual "Run workflow" button in your GitHub dashboard just in case
+  workflow_dispatch:
+
+jobs:
+  execute-scripts:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Pulls your code from your repository onto the GitHub runner machine
+      - name: Checkout repository code
+        uses: actions/checkout@v4
+
+      # 2. Sets up a clean Python environment
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      # 3. Installs the exact libraries your script needs to connect to CockroachDB
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+
+      # Main Step: Advance Decline Data
+      - name: Run Advance Decline Daily Data Fetcher Script
+        env:
+          PYTHONUNBUFFERED: "1"
+          database_password_cockroach_db: ${{ secrets.DATABASE_PASSWORD_COCKROACH_DB }}
+        run: |
+          python -u "adv_dec_daily_fetcher.py"

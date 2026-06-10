@@ -1,10 +1,9 @@
-name: Daily Data Database Updater
+name: Daily Price, Valuation and India Vix Database Updater
 
 on:
   schedule:
-    #23:00 Indian Standard Time
-    - cron: '00 23 * * *' #Minute, Hour, Day of the Month, Month, Day of Week
-      timezone: 'Asia/Kolkata'
+    #18:00 Indian Standard Time and UTC is +05:30 Hours of IST
+    - cron: '30 12 * * *'  #Minute, Hour, Day of the Month, Month, Day of Week
     # * represents null
   
   # Keeps a manual "Run workflow" button in your GitHub dashboard just in case
@@ -55,10 +54,3 @@ jobs:
         run: |
           python -u "india_vix_daily.py"
 
-      # Step 6: Your third script
-      - name: Run Advance Decline Daily Data Fetcher Script
-        env:
-          PYTHONUNBUFFERED: "1"
-          database_password_cockroach_db: ${{ secrets.DATABASE_PASSWORD_COCKROACH_DB }}
-        run: |
-          python -u "adv_dec_daily_fetcher.py"
