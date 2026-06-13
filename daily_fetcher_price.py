@@ -189,7 +189,7 @@ def today_date_fetch():
   today = date.today()
   return today
 
-today_date = today_date_fetch() - timedelta(days=1) #Just dump this line of code to test for previous days
+today_date = today_date_fetch()#Just dump this line of code to test for previous days
 today_date = today_date.strftime("%d-%m-%Y")
 
 def user_agent_and_impersonates_selection():
@@ -307,7 +307,7 @@ def data_inject_nse_main_database(data_nse_value, index_id):
     #Finally Pushing Whole Data into the Database
     query = text("INSERT INTO price_metadata (index_id, trade_date, open_price, high_price, low_price, close_price, last_updated_time, shares_traded, turnover_inr_cr) VALUES (:index_id, :trade_date, :open_price, :high_price, :low_price, :close_price, :last_updated_time, :shares_traded, :turnover_inr_cr)")
     conn.execute(query, {"index_id":index_id, "trade_date":date_program_formatted_datetime_onlydate, "open_price":open_index_value, "high_price":high_index_value, "low_price":low_index_value, "close_price":close_index_value, "last_updated_time":datetime.now(ZoneInfo("Asia/Kolkata")), "shares_traded":shares_traded_number, "turnover_inr_cr":turnover_inr_cr_value})
-    conn.commit()
+    conn.commit() #Because I have conn.commit() written explicitly, if CockroachDB loses power or goes offline while executing that line, the network packet confirming the commit will never reach your script. So basically query line will just build up the specific query, then the .execute line prepares the payload and sends it to cockroachDB, cockroachDB executes the following query if it fails to execute by any reason, the script will get disconnected and will not execute the next line of code, if it passes, then python script receives the packet saying "Ready for commit" and once the final .commit is executed, it cockroachDB officially checks that data is inserted properly and then sends the confirmation packet, which means that now the script will move onto next line and continue working while if it fails to send the confirmation packet at this stage, then the whole scripts crashes so to actually keep moving the script, confirmation is pretty important.
 
   return data_nse_value
 
