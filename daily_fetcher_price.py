@@ -189,7 +189,7 @@ def today_date_fetch():
   today = date.today()
   return today
 
-today_date = today_date_fetch()#Just dump this line of code to test for previous days
+today_date = today_date_fetch() - timedelta(days=1)#Just dump this line of code to test for previous days
 today_date = today_date.strftime("%d-%m-%Y")
 
 def user_agent_and_impersonates_selection():
