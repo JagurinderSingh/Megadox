@@ -5,7 +5,8 @@ import json
 import random
 from sqlalchemy import text
 import calendar
-from datetime import datetime, timedelta, date
+import datetime
+from datetime import timedelta, date
 from sqlalchemy import create_engine
 from curl_cffi import requests
 from decimal import Decimal
@@ -15,6 +16,20 @@ import os
 import logging
 from datetime import datetime as dt
 from dotenv import load_dotenv
+
+def today_day_fetch(): #Fetches today's day name as Saturday and Sunday also return the same data as Friday on NSE Official Website
+
+  today_day = datetime.date.today()
+  day_name = today_day.strftime("%A")
+  return day_name
+
+day_name_today = today_day_fetch()
+
+if day_name_today == "Saturday" or day_name_today == "Sunday":
+  sys.exit()
+
+else:
+  print(f"Today is {day_name_today}, Market is Open!")
 
 load_dotenv()
 
@@ -133,9 +148,9 @@ def data_inject_nse_main_database(data_nse_value):
         continue
 
   
-  date_program_datetime = datetime.strptime(today_date, "%d-%m-%Y") #Converting <str> datatype into datetime datatype
+  date_program_datetime = datetime.datetime.strptime(today_date, "%d-%m-%Y") #Converting <str> datatype into datetime datatype
   date_program_formatted = date_program_datetime.strftime("%Y-%m-%d") #Changed the Format of Date to match PostgreSQL
-  date_program_formatted_datetime = datetime.strptime(date_program_formatted, "%Y-%m-%d") #Converting <str> datatype into datetime datatype as changing format turns the date into <str> format
+  date_program_formatted_datetime = datetime.datetime.strptime(date_program_formatted, "%Y-%m-%d") #Converting <str> datatype into datetime datatype as changing format turns the date into <str> format
     
   #Formatting the Data into correct datatype
   advances_value = data_nse_value.get("Advances")
@@ -149,7 +164,7 @@ def data_inject_nse_main_database(data_nse_value):
     
   #Finally Pushing Whole Data into the Database
   query = text("INSERT INTO advance_decline_metadata (trade_date, advances, declines, advance_decline_ratio, last_updated_time) VALUES (:trade_date, :advances, :declines, :advance_decline_ratio, :last_updated_time)")
-  conn.execute(query, {"trade_date":date_program_formatted_datetime,"advances": advances_value, "declines":declines_value, "advance_decline_ratio":adv_dec_ratio_value, "last_updated_time":datetime.now(ZoneInfo("Asia/Kolkata"))})
+  conn.execute(query, {"trade_date":date_program_formatted_datetime,"advances": advances_value, "declines":declines_value, "advance_decline_ratio":adv_dec_ratio_value, "last_updated_time":datetime.datetime.now(ZoneInfo("Asia/Kolkata"))})
   conn.commit()
 
   return data_nse_value
@@ -230,11 +245,11 @@ with output_database_engine_connection.connect() as conn:
     output_injection = data_inject_nse_main_database(all_advance_data_count)
 
     # ── OUTPUT BLOCK — only the 5 fields going into the DB ───────────────────
-    date_for_display = datetime.strptime(today_date, "%d-%m-%Y").strftime("%Y-%m-%d")
+    date_for_display = datetime.datetime.strptime(today_date, "%d-%m-%Y").strftime("%Y-%m-%d")
     advances_display = output_injection.get("Advances")
     declines_display = output_injection.get("Declines")
     ratio_display = round((advances_display / declines_display), 2)
-    last_updated_display = datetime.now(ZoneInfo("Asia/Kolkata")).strftime("%d-%b-%Y %I:%M:%S %p")
+    last_updated_display = datetime.datetime.now(ZoneInfo("Asia/Kolkata")).strftime("%d-%b-%Y %I:%M:%S %p")
 
     logger.info(f"  ┌─ CLEANED OUTPUT (INJECTED TO DB) {'─'*36}┐")
     logger.info(f"  │    {'trade_date':<35} : {date_for_display}")
@@ -245,7 +260,7 @@ with output_database_engine_connection.connect() as conn:
     logger.info(f"  └{'─'*71}┘")
     logger.info(f"")
 
-    last_updated = datetime.now(ZoneInfo("Asia/Kolkata"))
+    last_updated = datetime.datetime.now(ZoneInfo("Asia/Kolkata"))
     logger.info(f"  INJECTION     : ✓  COMMITTED TO advance_decline_metadata")
     logger.info(f"  LAST UPDATED  : {last_updated.strftime('%d-%b-%Y %I:%M:%S %p')}")
     logger.info(f"")
