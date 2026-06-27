@@ -3,8 +3,6 @@
 .venv
 venv
 tempCodeRunnerFile.py
-holidays_robustness.py
 __pycache__/
 .vscode
-ReportLab_pdf.py
-log_to_pdf.py
+third_party_verification.py
