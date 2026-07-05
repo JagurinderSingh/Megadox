@@ -1,5 +1,6 @@
 #Importing Important Libraries - Code Lines from 1 to 33 are those self made components that will be used in the whole program
 
+import psycopg2
 import urllib.parse
 import time
 import json
@@ -113,10 +114,10 @@ logger.info(f"")
 def database_engine_connection():
 
   #Engine Connection Established
-  database_password = os.getenv("database_password")
+  database_password = os.getenv("database_password_cockroach_db")
   log_kv("DB password env", "present" if database_password else "missing")
-  DB_URL = f"postgresql+psycopg://postgres:{database_password}@localhost:5432/index_value_strategy"
-  log_kv("DB target", "postgresql+psycopg://postgres:***@localhost:5432/index_value_strategy")
+  DB_URL = f"cockroachdb://postgres:{database_password}@megadox-27437.j77.aws-ap-south-1.cockroachlabs.cloud:26257/index_value_strategy?sslmode=verify-full"
+  log_kv("DB target", "cockroachdb://postgres:***@megadox-27437.j77.aws-ap-south-1.cockroachlabs.cloud:26257/index_value_strategy?sslmode=verify-full")
   engine = create_engine(DB_URL)
   log_kv("Engine object", "created")
   return engine
