@@ -492,3 +492,5 @@ This repository is public **for viewing purposes only**. No license is granted, 
 > ```
 
 If you ever *do* want others to be able to use this (e.g. as a portfolio piece people can fork and learn from, but not resell), consider a source-available license like a modified MIT with a non-commercial clause, or [PolyForm Noncommercial](https://polyformproject.org/licenses/noncommercial/1.0.0/) — but that's a deliberate opt-in, not the default you want here.
+
+This repository was archived on 7 September 2026 at 00:15 IST.
