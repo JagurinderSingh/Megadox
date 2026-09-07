@@ -479,18 +479,14 @@ When execution moved to **GitHub Actions**, `logs_email.py` was **not** carried 
 **Proprietary — All Rights Reserved. No reuse, copying, modification, or redistribution permitted.**
 
 This repository is public **for viewing purposes only**. No license is granted, express or implied, to use, copy, modify, merge, publish, distribute, sublicense, or sell copies of this code, in whole or in part, for any purpose, commercial or non-commercial, without prior written permission from the copyright holder.
-
-> ⚠️ A public GitHub repo with no `LICENSE` file does **not** mean "no restrictions" — under default copyright law, the absence of a license means *nobody* automatically has permission to reuse the code, but relying on that default is easy to overlook or misread. Add an explicit `LICENSE` file to the repo root with wording along these lines (adjust the year/holder) so the restriction is unambiguous to anyone who finds the repo, rather than relying on visitors already knowing the default rule:
 >
 > ```
-> Copyright (c) <year> <your name/organization>. All Rights Reserved.
+> Copyright (c) 2026 Megadox. All Rights Reserved.
 >
 > This source code and associated documentation files are proprietary
 > and confidential. Unauthorized copying, modification, distribution,
 > or use of this software, via any medium, is strictly prohibited
 > without the express prior written permission of the copyright holder.
 > ```
-
-If you ever *do* want others to be able to use this (e.g. as a portfolio piece people can fork and learn from, but not resell), consider a source-available license like a modified MIT with a non-commercial clause, or [PolyForm Noncommercial](https://polyformproject.org/licenses/noncommercial/1.0.0/) — but that's a deliberate opt-in, not the default you want here.
 
 This repository was archived on 7 September 2026 at 00:15 IST.
